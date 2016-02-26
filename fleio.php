@@ -1,6 +1,6 @@
 <?php 
 
-require_once __DIR__ . '/curl.php';
+require_once __DIR__ . '/api.php';
 
 function fleio_ConfigOptions() {
     global $_LANG;
@@ -29,75 +29,78 @@ function fleio_ConfigOptions() {
 }
 
 function fleio_CreateAccount( $params ) {
-    logactivity('Params: ' . serialize($params));
-    $fu = new FleioUser( $params );
-    logactivity('CreateAccount: ' . serialize($fu->createAccount()));
+    $fu = new Fleio( $params );
+    try {
+        $client = $fu->createClient();
+        $fl_user = $fu->createUser($client["id"]);
+    } catch (FLApiException $e) {
+        return $e->getMessage();
+    }
+    return "success";
 }
 
 function fleio_SuspendAccount($params) {
-logactivity('Fleio suspend called');
+    return "Not implemented";
 }
 
-function build_str_to_hash($args)
-{
-    $result = '';
-    foreach ($args as $arg) {
-        $s = (string)$arg;
-        $result .= (string)(strlen($s)) . $s;
-    }
-    return $result;
+function fleio_UnsuspendAccount($params) {
+    return "Not implemented";
 }
 
-function get_hash_val($hash_key, $args)
-{
-    $str = build_str_to_hash($args);
-    $hash_val = hash_hmac('sha1', $str, $hash_key);
-    return strtoupper($hash_val);
+function fleio_TerminateAccount($params) {
+    return "Not implemented";
 }
 
-
-class FleioUser {
-    private $server;
+class Fleio {
+    private $SERVER;
+    private $PROD_ID;
+    private $USER_PREFIX='whmcs';
 
     public function __construct( $params ) {
-        $this->server = new stdClass;
+        $this->SERVER = new stdClass;
         if( $params[ 'serversecure' ] == 'fake' ) {
-            $this->server->ip = 'https://';
+            $this->SERVER->url = 'https://';
         }
         else {
-            $this->server->ip = 'http://';
+            $this->SERVER->url = 'http://';
         }
-        $this->server->ip .= empty( $params[ 'serverip' ] ) ? $params[ 'serverhostname' ] : $params[ 'serverip' ];
-        $this->server->user = $params[ 'serverusername' ];
-        $this->server->pass = $params[ 'serverpassword' ];
+        $this->SERVER->url .= empty( $params[ 'serverip' ] ) ? $params[ 'serverhostname' ] : $params[ 'serverip' ];
+        $this->SERVER->token = $params[ 'serveraccesshash' ];
         $this->clientsdetails = $params['clientsdetails'];
-        $this->curl = new Curl($this->server->ip);
+        $this->PROD_ID = (string)$params['pid'];
+        $this->flApi = new FLApi($this->SERVER->url, $this->SERVER->token);
     }
 
-    public function auth() {
-        $url = '/staffapi/auth/login';
-        $postfields = array('username' => $this->server->user, 'password' => $this->server->pass);
-        $this->_curl_init();
-        $response = $this->request($url, $postfields);
-        return $response;
-    }
-
-    public function createAccount() {
-        $this->auth();
-        $user_url = '/staffapi/users';
-        $postfields = array("username" => 'whmcs' . $this->clientsdetails['userid'],
+    public function createUser($client_id) {
+        $url = '/staffapi/users';
+        $postf = array("username" => $this->USER_PREFIX . $this->PROD_ID,
             "email" => $this->clientsdetails['email'],
+            "email_verified" => true,
             "first_name" => $this->clientsdetails['firstname'],
             "last_name" => $this->clientsdetails['lastname'],
-            "external_billing_id" => $this->clientsdetails['userid']
-        );
-        $response = $this->request($user_url, $postfields);
-        logactivity(serialize(response));
+            "external_billing_id" => $this->PROD_ID);
+        return $this->flApi->post($url, $postf);
+    }
+
+    public function createClient() {
         $url = '/staffapi/clients';
-        $postfields = array('name' => 'Test WHMCS', 'first_name' => 'Cristi', 'last_name' => 'Tomo', 'address1' => 'Ionesco', 'city' => 'Cluj-Napoca', 'country' => 'RO', 'zip_code' => '515400', 'phone' => '12345', 'email' => 'ctomoiaga@gmail.com');
-        //$this->auth();
-        $response = $this->request($url, $postfields);
-        return $response;
+        $postfields = array('first_name' => $this->clientsdetails['firstname'],
+             'last_name' => $this->clientsdetails['lastname'],
+             'company' => $this->clientsdetails['company'],
+             'address1' => $this->clientsdetails['address1'],
+             'address2' => $this->clientsdetails['address2'],
+             'city' => $this->clientsdetails['city'],
+             'state' => $this->clientsdetails['state'],
+             'country' => $this->clientsdetails['countrycode'],
+             'zip_code' => $this->clientsdetails['postcode'],
+             'phone' => $this->clientsdetails['phonenumber'],
+             'fax' => $this->clientsdetails['fax'],
+             'email' => $this->clientsdetails['email']);
+        return $this->flApi->post($url, $postfields);
+    }
+
+    public static function generatePassword() {
+        return substr( str_shuffle( '~!@$%^&*(){}|0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' ), 0, 20 );
     }
 }
 
