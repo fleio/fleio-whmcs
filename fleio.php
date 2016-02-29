@@ -40,11 +40,25 @@ function fleio_CreateAccount( $params ) {
 }
 
 function fleio_SuspendAccount($params) {
-    return "Not implemented";
+    $fu = new Fleio( $params );
+    try {
+        $result = $fu->suspendOpenstack();
+    } catch (FLApiException $e) {
+        return $e->getMessage();
+    }
 }
 
 function fleio_UnsuspendAccount($params) {
-    return "Not implemented";
+    $fu = new Fleio( $params );
+    try {
+        $result = $fu->resumeOpenstack();
+    } catch (FLApiException $e) {
+        return $e->getMessage();
+    }
+}
+
+function fleio_ServiceSingleSignOn( array $params ) {
+    $return = array( 'success' => false, );
 }
 
 function fleio_TerminateAccount($params) {
@@ -73,12 +87,12 @@ class Fleio {
 
     public function createUser($client_id) {
         $url = '/staffapi/users';
-        $postf = array("username" => $this->USER_PREFIX . $this->PROD_ID,
+        $postf = array("username" => $this->USER_PREFIX . $this->clientsdetails['userid'],
             "email" => $this->clientsdetails['email'],
             "email_verified" => true,
             "first_name" => $this->clientsdetails['firstname'],
             "last_name" => $this->clientsdetails['lastname'],
-            "external_billing_id" => $this->PROD_ID);
+            "external_billing_id" => $this->clientsdetails['userid']);
         return $this->flApi->post($url, $postf);
     }
 
@@ -95,8 +109,43 @@ class Fleio {
              'zip_code' => $this->clientsdetails['postcode'],
              'phone' => $this->clientsdetails['phonenumber'],
              'fax' => $this->clientsdetails['fax'],
-             'email' => $this->clientsdetails['email']);
+             'email' => $this->clientsdetails['email'],
+             'external_billing_id' => $this->PROD_ID);
         return $this->flApi->post($url, $postfields);
+    }
+
+    private function getClientId() {
+        $url = '/staffapi/clients';
+        $query_params = array('external_billing_id' => $this->PROD_ID);
+        $response = $this->flApi->get($url, $query_params);
+        if ($response == null) {
+            return null;
+        }
+        $objects = $response['objects'];
+        if (count($objects) > 1) {
+            return null; // Multiple objects returned
+        }
+        return $objects[0]['id'];
+    }
+
+    public function suspendOpenstack() {
+        $fleio_client_id = $this->getClientId();
+        if ($fleio_client_id != null) {
+            $url = '/staffapi/clients/' . $fleio_client_id . '/suspend';
+            return $this->flApi->post($url);
+        } else {
+            return "Unable to retrieve the Fleio client ID";
+        }
+    }
+
+    public function resumeOpenstack() {
+        $fleio_client_id = $this->getClientId();
+        if ($fleio_client_id != null) {
+            $url = '/staffapi/clients/' . $fleio_client_id . '/resume';
+            return $this->flApi->post($url);
+        } else {
+            return "Unable to retrieve the Fleio client ID";
+        }
     }
 
     public static function generatePassword() {
