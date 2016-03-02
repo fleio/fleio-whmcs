@@ -4,6 +4,7 @@ class FlApiException extends Exception {}
 class FlApiCurlException extends FlApiException {}
 class FlApiRequestException extends FlApiException {}
 
+
 class FlApi {
     private $SERVER_URL;
     private $SERVER_TOKEN;
@@ -35,6 +36,8 @@ class FlApi {
         $ch = curl_init();
         if (is_array($params)) {
             $getfields = http_build_query($params);
+            str_replace('.', '%2E', $getfields);
+            str_replace('-', '%2D', $getfields);
             $url .= '?'.$getfields;
         }
         $response = $this->request($ch, 'GET', $url);
@@ -53,10 +56,13 @@ class FlApi {
         if ($result === false)  {
             throw new FlApiCurlException(curl_error($ch), curl_errno($ch));
         } else {
+            if ($httpcode > 499) {
+                throw new FlApiRequestException('An internal Fleio API error occurred', $httpcode);
+            }
             if ($httpcode > 399) { 
                 throw new FlApiRequestException($result, $httpcode);
             }
         }
         return json_decode($result, true);
-    }   
+    }
 }

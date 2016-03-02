@@ -5,24 +5,12 @@ require_once __DIR__ . '/api.php';
 function fleio_ConfigOptions() {
     global $_LANG;
     $configarray = array(
-    "username" => array (
-        "FriendlyName" => "UserName",
+    "frontendurl" => array (
+        "FriendlyName" => "FleioFrontend",
         "Type" => "text", # Text Box
-        "Size" => "25", # Defines the Field Width
-        "Description" => "Textbox",
-        "Default" => "Example",
-    ),
-    "password" => array (
-        "FriendlyName" => "Password",
-        "Type" => "password", # Password Field
-        "Size" => "25", # Defines the Field Width
-        "Description" => "Password",
-        "Default" => "Example",
-    ),
-    "usessl" => array (
-        "FriendlyName" => "Enable SSL",
-        "Type" => "yesno", # Yes/No Checkbox
-        "Description" => "Tick to use secure connections",
+        "Size" => "64", # Defines the Field Width
+        "Description" => "Fleio frontend url",
+        "Default" => "https://",
     ),
     );
     return $configarray;
@@ -31,8 +19,9 @@ function fleio_ConfigOptions() {
 function fleio_CreateAccount( $params ) {
     $fu = new Fleio( $params );
     try {
+        $fl_user = $fu->createUser();
         $client = $fu->createClient();
-        $fl_user = $fu->createUser($client["id"]);
+        $utoc = $fu->addUserToClient($client['id'], $fl_user['id']);
     } catch (FLApiException $e) {
         return $e->getMessage();
     }
@@ -57,20 +46,39 @@ function fleio_UnsuspendAccount($params) {
     }
 }
 
-function fleio_ServiceSingleSignOn( array $params ) {
-    $return = array( 'success' => false, );
-}
-
 function fleio_TerminateAccount($params) {
     return "Not implemented";
 }
+
+
+function fleio_login($params) {
+    $fu = new Fleio($params);
+    $url = $fu->getSsoUrl();
+    header("Location: " . $url);
+    return "success";
+}
+
+function fleio_ServiceSingleSignOn($params) {
+    $fu = new Fleio($params);
+    $url = $fu->getSsoUrl();
+    return array("success" => true, "redirectTo" => $url);
+}
+
+
+function fleio_ClientAreaCustomButtonArray() {
+    $buttonarray = array(
+     "Login to Fleio" => "login",
+    );
+    return $buttonarray;
+}
+
 
 class Fleio {
     private $SERVER;
     private $PROD_ID;
     private $USER_PREFIX='whmcs';
 
-    public function __construct( $params ) {
+    public function __construct($params) {
         $this->SERVER = new stdClass;
         if( $params[ 'serversecure' ] == 'fake' ) {
             $this->SERVER->url = 'https://';
@@ -78,14 +86,15 @@ class Fleio {
         else {
             $this->SERVER->url = 'http://';
         }
-        $this->SERVER->url .= empty( $params[ 'serverip' ] ) ? $params[ 'serverhostname' ] : $params[ 'serverip' ];
+        $this->SERVER->frontend_url .= empty($params['configoption1']) ? $params['serverhostname'] : $params['configoption1'];
+        $this->SERVER->url .= empty($params['serverip']) ? $params['serverhostname'] : $params['serverip'];
         $this->SERVER->token = $params[ 'serveraccesshash' ];
         $this->clientsdetails = $params['clientsdetails'];
         $this->PROD_ID = (string)$params['pid'];
         $this->flApi = new FLApi($this->SERVER->url, $this->SERVER->token);
     }
 
-    public function createUser($client_id) {
+    public function createUser() {
         $url = '/staffapi/users';
         $postf = array("username" => $this->USER_PREFIX . $this->clientsdetails['userid'],
             "email" => $this->clientsdetails['email'],
@@ -128,6 +137,49 @@ class Fleio {
         return $objects[0]['id'];
     }
 
+    public function getUserId() {
+        $url = '/staffapi/users';
+        $query_params = array('external_billing_id' => $this->clientsdetails['userid']);
+        $response = $this->flApi->get($url, $query_params);
+        if ($response == null) {
+            return null;
+        }
+        $objects = $response['objects'];
+        if (count($objects) > 1) {
+            return null;
+        }
+        return $objects[0]['id'];
+    }
+
+    public function addUserToClient($client_id, $user_id) {
+        $url = '/staffapi/clients/' . $client_id . '/add_user';
+        $postfields = array('user' => $user_id, 'client' => $client_id);
+        return $this->flApi->post($url, $postfields);
+    }
+
+    private function getSSOHash() {
+        $url = '/api/sso-hash/' . $this->clientsdetails['userid'];
+        return $this->flApi->post($url);
+    }
+
+    public function getSSOUrl() {
+        $euid = $this->clientsdetails['userid'];
+        $url = $this->SERVER->frontend_url . '/sso?';
+        $rsp = $this->getSSOHash();
+        logactivity($rsp);
+        $params = array( 'euid', 'timestamp', 'hash_val' );
+        $send_params = array_combine($params, explode(":", $rsp['hash_val']));
+        logactivity($send_params);
+        $send_params = http_build_query($send_params);
+        return  $url . $send_params;
+    }
+
+    public function getToken($user_id) {
+        $url = '/staffapi/users/' . $user_id . '/token';
+        $response = $this->flApi->post($url);
+        return $response['token'];
+    }
+
     public function suspendOpenstack() {
         $fleio_client_id = $this->getClientId();
         if ($fleio_client_id != null) {
@@ -146,10 +198,6 @@ class Fleio {
         } else {
             return "Unable to retrieve the Fleio client ID";
         }
-    }
-
-    public static function generatePassword() {
-        return substr( str_shuffle( '~!@$%^&*(){}|0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ' ), 0, 20 );
     }
 }
 
