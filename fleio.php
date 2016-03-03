@@ -50,18 +50,27 @@ function fleio_TerminateAccount($params) {
     return "Not implemented";
 }
 
-
 function fleio_login($params) {
     $fu = new Fleio($params);
-    $url = $fu->getSsoUrl();
-    header("Location: " . $url);
-    return "success";
+    try {
+        $url = $fu->getSSOUrl();
+        header("Location: " . $url);
+        return "success";
+    } catch (FLApiException $e) {
+        //TODO(tomo): Handle the $e->getMessage() message
+        return "Unable to retrieve a SSO session";
+    }
 }
 
 function fleio_ServiceSingleSignOn($params) {
     $fu = new Fleio($params);
-    $url = $fu->getSsoUrl();
-    return array("success" => true, "redirectTo" => $url);
+    try {
+        $url = $fu->getSSOUrl();
+        return array("success" => true, "redirectTo" => $url);
+    } catch (FLApiException $e) {
+        //TODO(tomo): Handle the $e->getMessage() message
+        return array("success" => false, "errorMsg" => "Unable to retrieve a SSO session");
+    }
 }
 
 
@@ -157,19 +166,18 @@ class Fleio {
         return $this->flApi->post($url, $postfields);
     }
 
-    private function getSSOHash() {
-        $url = '/api/sso-hash/' . $this->clientsdetails['userid'];
-        return $this->flApi->post($url);
+    private function getSSOSession() {
+        $url = '/staffapi/auth/get_sso_session';
+        $params = array('euid' => $this->clientsdetails['userid']);
+        return $this->flApi->post($url, $params);
     }
 
     public function getSSOUrl() {
         $euid = $this->clientsdetails['userid'];
         $url = $this->SERVER->frontend_url . '/sso?';
-        $rsp = $this->getSSOHash();
-        logactivity($rsp);
+        $rsp = $this->getSSOSession();
         $params = array( 'euid', 'timestamp', 'hash_val' );
         $send_params = array_combine($params, explode(":", $rsp['hash_val']));
-        logactivity($send_params);
         $send_params = http_build_query($send_params);
         return  $url . $send_params;
     }
