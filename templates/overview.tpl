@@ -2,15 +2,16 @@
     <div class="col-md-6">
         <div class="panel panel-default" id="cPanelPackagePanel">
             <div class="panel-heading">
-                <h3 class="panel-title">Credit</h3>
+                <h3 class="panel-title">Available credit</h3>
             </div>
             <div class="panel-body text-center">
-                <h4>Available credit: $9.67</h4>
+                <h4>Fleio balance: {$fleioUsage.available_balance}</h4>
                 <div class="col-lg-8 col-lg-offset-2">
-                    <form>
+                    <form role="form" method="post" action="clientarea.php?action=productdetails&id={$serviceid}">
+                        <input type="hidden" name="customAction" value="addflfunds" />
                         <div class="input-group">
-                            <span class="input-group-addon">$</span>
-                            <input type="number" min="10" step="0.01" max="1000" value="10.00" class="form-control text-right">
+                            <span class="input-group-addon">{$currency.code}</span>
+                            <input name="amount" type="number" min="{$minamount}" step="0.01" max="{$maxamount}" value="{$minamount}" class="form-control text-right">
                             <span class="input-group-btn">
                                 <input type="submit" value="Add funds" class="btn btn-success">
                             </span>
@@ -18,6 +19,9 @@
                     </form>
                 </div>
             </div>
+           {if $addfundserror}
+            <div class="text-danger text-center limit-near">{$addfundserror}</div>
+           {/if}
        </div>
     </div>
     <div class="col-md-6">

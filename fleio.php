@@ -1,5 +1,9 @@
 <?php 
 
+if (!defined("WHMCS")) {
+    die("This file cannot be accessed directly");
+}
+
 require_once __DIR__ . '/api.php';
 
 function fleio_ConfigOptions() {
@@ -61,6 +65,7 @@ function fleio_login($params) {
         return "Unable to retrieve a SSO session";
     }
 }
+
 
 function fleio_ServiceSingleSignOn($params) {
     $fu = new Fleio($params);
@@ -182,6 +187,12 @@ class Fleio {
         return  $url . $send_params;
     }
 
+    public function getUsage() {
+        $client_id = $this->getClientId();
+        $url = '/staffapi/clients/' . $client_id . '/usage';
+        return $this->flApi->get($url);
+    }
+
     public function getToken($user_id) {
         $url = '/staffapi/users/' . $user_id . '/token';
         $response = $this->flApi->post($url);
@@ -241,27 +252,53 @@ class Fleio {
  */
 function fleio_ClientArea(array $params)
 {
-    // Determine the requested action and set service call parameters based on
-    // the action.
+    $min_amount = 10;
+    $max_amount = 1000;
+    $minamount = convertCurrency($min_amount, 1, $params['clientsdetails']['currency']);
+    $maxamount = convertCurrency($max_amount, 1, $params['clientsdetails']['currency']);
+
     $requestedAction = isset($_REQUEST['customAction']) ? $_REQUEST['customAction'] : '';
     if ($requestedAction == 'manage') {
         $serviceAction = 'get_usage';
         $templateFile = 'templates/manage.tpl';
-    } else {
+        $exv2 = 'manage';
+    }
+    if ($requestedAction == 'stats') {
         $serviceAction = 'get_stats';
         $templateFile = 'templates/overview.tpl';
+        $exv2 = 'stats';
+    }
+    if ($requestedAction == 'addflfunds') {
+        $serviceAction = 'addflfunds';
+        $exv2 = 'addflfunds';
+        $amount = $_REQUEST["amount"];
+        try {
+            $result = fleio_addFunds($amount, $minamount, $maxamount, $params);
+        } catch (Exception $e) {
+            $addfundserror = $e->getMessage();
+        } 
+        $templateFile = 'templates/overview.tpl';
+    } else {
+        $serviceAction = 'overview';
+        $templateFile = 'templates/overview.tpl';
+        $exv2 = 'overview';
     }
     try {
         // Call the service's function based on the request action, using the
         // values provided by WHMCS in `$params`.
         $response = array();
-        $extraVariable1 = 'abc';
-        $extraVariable2 = '123';
+        $fl = new Fleio($params);
+        $usage = $fl->getUsage();
+        $fleioUsage = $usage;
         return array(
             'tabOverviewReplacementTemplate' => $templateFile,
             'templateVariables' => array(
-                'extraVariable1' => $extraVariable1,
-                'extraVariable2' => $extraVariable2,
+                'fleioUsage' => $fleioUsage,
+                'exv2' => $exv2,
+                'minamount' => $minamount,
+                'maxamount' => $maxamount,
+                "addfundserror" => $addfundserror,
+                "currency" => getCurrency($params['clientsdetails']['userid']),
             ),
         );
     } catch (Exception $e) {
@@ -283,3 +320,53 @@ function fleio_ClientArea(array $params)
     }
 }
 
+
+function fleio_validateAmount($original_amount, $min, $max) {
+    // Validate amount
+    // Using , instead of . (dot) ?
+    $amount = str_replace(",", ".", $original_amount);
+    if (!is_numeric($amount)) {
+        throw new Exception("Please enter a valid amount.");
+    } 
+    if ($amount < $min) {
+        $def_msg = isset($_LANG['addfundsminimumerror']) ? $_LANG['addfundsminimumerror'] : 'Amount must be equal or greated than'; 
+        throw new Exception($def_msg." ".formatCurrency($min));
+    }
+    if ($amount > $max) {
+        $def_msg = isset($_LANG['addfundsmaximumerror']) ? $_LANG['addfundsmaximumerror'] : 'Amount must be smaller than';
+        throw new Exception($def_msg." ".formatCurrency($max));
+    }
+   return $amount;
+}
+
+
+function fleio_addFunds($original_amount, $min, $max, $params) {
+    $amount = fleio_validateAmount($original_amount, $min, $max);
+    $clientsdetails = $params['clientsdetails'];
+
+    $command = "createinvoice";
+    $values["userid"] = $clientsdetails['userid'];
+    $values["date"] = toMySQLDate(getTodaysDate());
+    $values["duedate"] = toMySQLDate(getTodaysDate());
+    //$values["paymentmethod"] = $paymentmethod;
+    $values["sendinvoice"] = false;
+    $values["itemdescription1"] = 'Openstack cloud services';
+    $values["itemamount1"] = $amount;
+    $values["itemtaxed1"] = true;
+    $values["notes"] = "fleio";
+
+    $results = localAPI($command,$values,$ADMIN_USER);
+
+    if ($results["result"] == "success") {
+        # Invoice created.
+        $log_msg = "User ID: ".$clientsdetails['userid']." adding ".formatCurrency($amount)." as Fleio credit. Invoice ID: ".$results["invoiceid"];
+        logActivity($log_msg);
+        //$table = "tblinvoiceitems";
+        //$update = array("type"=>"fleio");
+        //$where = array("invoiceid"=>$results["invoiceid"], "userid"=>$client->getID());
+        //update_query($table,$update,$where);
+        redir("id=".(int)$results["invoiceid"],"viewinvoice.php");
+    } else {
+        throw new Exception($results["message"]);
+    }
+}
