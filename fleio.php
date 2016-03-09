@@ -10,72 +10,124 @@ function fleio_ConfigOptions() {
     global $_LANG;
     $configarray = array(
     "frontendurl" => array (
-        "FriendlyName" => "FleioFrontend",
+        "FriendlyName" => "Fleio Frontend",
         "Type" => "text", # Text Box
         "Size" => "64", # Defines the Field Width
-        "Description" => "Fleio frontend url",
+        "Description" => "",
         "Default" => "https://",
+    ),
+    "minamount" => array (
+        "FriendlyName" => "Minimum amount",
+        "Type" => "text", # Text Box
+        "Size" => "10", # Defines the Field Width
+        "Description" => "",
+        "Default" => "10",
+    ),
+    "maxamount" => array (
+        "FriendlyName" => "Maximum amount",
+        "Type" => "text", # Text Box
+        "Size" => "10", # Defines the Field Width
+        "Description" => "",
+        "Default" => "1000",
     ),
     );
     return $configarray;
 }
 
 function fleio_CreateAccount( $params ) {
-    $fu = new Fleio( $params );
+    $fl = Fleio::fromParams( $params );
     try {
-        $fl_user = $fu->createUser();
-        $client = $fu->createClient();
-        $utoc = $fu->addUserToClient($client['id'], $fl_user['id']);
-    } catch (FLApiException $e) {
+        $fl_user = $fl->createUser();
+        $client = $fl->createClient();
+        $utoc = $fl->addUserToClient($client['id'], $fl_user['id']);
+    } catch (FlApiException $e) {
         return $e->getMessage();
     }
     return "success";
 }
 
 function fleio_SuspendAccount($params) {
-    $fu = new Fleio( $params );
+    $fl = Fleio::fromParams( $params );
     try {
-        $result = $fu->suspendOpenstack();
-    } catch (FLApiException $e) {
+        $result = $fl->suspendOpenstack();
+    } catch (FlApiException $e) {
         return $e->getMessage();
     }
 }
 
 function fleio_UnsuspendAccount($params) {
-    $fu = new Fleio( $params );
+    $fl = Fleio::fromParams( $params );
     try {
-        $result = $fu->resumeOpenstack();
-    } catch (FLApiException $e) {
+        $result = $fl->resumeOpenstack();
+    } catch (FlApiException $e) {
         return $e->getMessage();
     }
 }
 
 function fleio_TerminateAccount($params) {
+    $fl = Fleio::fromParams($params);
+    try {
+        $result = $fl->terminateOpenstack();
+    } catch (FlApiException $e) {
+        logactivity($e->getMessage());
+        return "Unable to terminate the account. See the activity logs for details.";
+    }
     return "Not implemented";
 }
 
 function fleio_login($params) {
-    $fu = new Fleio($params);
+    $fl = Fleio::fromParams($params);
     try {
-        $url = $fu->getSSOUrl();
+        $url = $fl->getSSOUrl();
         header("Location: " . $url);
         return "success";
-    } catch (FLApiException $e) {
+    } catch (FlApiException $e) {
         //TODO(tomo): Handle the $e->getMessage() message
         return "Unable to retrieve a SSO session";
     }
 }
 
+function fleio_TestConnection(array $params)
+{
+    try {
+        // Call the service's connection test function.
+        $fl = Fleio::fromParams($params);
+        $fl->testConnection(); 
+        $success = false;
+        $errorMsg = 'TestConnection not implemented in module';
+    } catch (Exception $e) {
+        // Record the error in WHMCS's module log.
+        logModuleCall(
+            'provisioningmodule',
+            __FUNCTION__,
+            $params,
+            $e->getMessage(),
+            $e->getTraceAsString()
+        );
+        $success = false;
+        $errorMsg = $e->getMessage();
+    }
+    return array(
+        'success' => $success,
+        'error' => $errorMsg,
+    );
+}
+
 
 function fleio_ServiceSingleSignOn($params) {
-    $fu = new Fleio($params);
+    $fl = Fleio::fromParams($params);
     try {
-        $url = $fu->getSSOUrl();
+        $url = $fl->getSSOUrl();
         return array("success" => true, "redirectTo" => $url);
-    } catch (FLApiException $e) {
+    } catch (FlApiException $e) {
         //TODO(tomo): Handle the $e->getMessage() message
         return array("success" => false, "errorMsg" => "Unable to retrieve a SSO session");
     }
+}
+
+
+function fleio_AdminLink( $params ) {
+    return "AdminLink not implemented";
 }
 
 
@@ -86,139 +138,6 @@ function fleio_ClientAreaCustomButtonArray() {
     return $buttonarray;
 }
 
-
-class Fleio {
-    private $SERVER;
-    private $PROD_ID;
-    private $USER_PREFIX='whmcs';
-
-    public function __construct($params) {
-        $this->SERVER = new stdClass;
-        if( $params[ 'serversecure' ] == 'fake' ) {
-            $this->SERVER->url = 'https://';
-        }
-        else {
-            $this->SERVER->url = 'http://';
-        }
-        $this->SERVER->frontend_url .= empty($params['configoption1']) ? $params['serverhostname'] : $params['configoption1'];
-        $this->SERVER->url .= empty($params['serverip']) ? $params['serverhostname'] : $params['serverip'];
-        $this->SERVER->token = $params[ 'serveraccesshash' ];
-        $this->clientsdetails = $params['clientsdetails'];
-        $this->PROD_ID = (string)$params['pid'];
-        $this->flApi = new FLApi($this->SERVER->url, $this->SERVER->token);
-    }
-
-    public function createUser() {
-        $url = '/staffapi/users';
-        $postf = array("username" => $this->USER_PREFIX . $this->clientsdetails['userid'],
-            "email" => $this->clientsdetails['email'],
-            "email_verified" => true,
-            "first_name" => $this->clientsdetails['firstname'],
-            "last_name" => $this->clientsdetails['lastname'],
-            "external_billing_id" => $this->clientsdetails['userid']);
-        return $this->flApi->post($url, $postf);
-    }
-
-    public function createClient() {
-        $url = '/staffapi/clients';
-        $postfields = array('first_name' => $this->clientsdetails['firstname'],
-             'last_name' => $this->clientsdetails['lastname'],
-             'company' => $this->clientsdetails['company'],
-             'address1' => $this->clientsdetails['address1'],
-             'address2' => $this->clientsdetails['address2'],
-             'city' => $this->clientsdetails['city'],
-             'state' => $this->clientsdetails['state'],
-             'country' => $this->clientsdetails['countrycode'],
-             'zip_code' => $this->clientsdetails['postcode'],
-             'phone' => $this->clientsdetails['phonenumber'],
-             'fax' => $this->clientsdetails['fax'],
-             'email' => $this->clientsdetails['email'],
-             'external_billing_id' => $this->PROD_ID);
-        return $this->flApi->post($url, $postfields);
-    }
-
-    private function getClientId() {
-        $url = '/staffapi/clients';
-        $query_params = array('external_billing_id' => $this->PROD_ID);
-        $response = $this->flApi->get($url, $query_params);
-        if ($response == null) {
-            return null;
-        }
-        $objects = $response['objects'];
-        if (count($objects) > 1) {
-            return null; // Multiple objects returned
-        }
-        return $objects[0]['id'];
-    }
-
-    public function getUserId() {
-        $url = '/staffapi/users';
-        $query_params = array('external_billing_id' => $this->clientsdetails['userid']);
-        $response = $this->flApi->get($url, $query_params);
-        if ($response == null) {
-            return null;
-        }
-        $objects = $response['objects'];
-        if (count($objects) > 1) {
-            return null;
-        }
-        return $objects[0]['id'];
-    }
-
-    public function addUserToClient($client_id, $user_id) {
-        $url = '/staffapi/clients/' . $client_id . '/add_user';
-        $postfields = array('user' => $user_id, 'client' => $client_id);
-        return $this->flApi->post($url, $postfields);
-    }
-
-    private function getSSOSession() {
-        $url = '/staffapi/auth/get_sso_session';
-        $params = array('euid' => $this->clientsdetails['userid']);
-        return $this->flApi->post($url, $params);
-    }
-
-    public function getSSOUrl() {
-        $euid = $this->clientsdetails['userid'];
-        $url = $this->SERVER->frontend_url . '/sso?';
-        $rsp = $this->getSSOSession();
-        $params = array( 'euid', 'timestamp', 'hash_val' );
-        $send_params = array_combine($params, explode(":", $rsp['hash_val']));
-        $send_params = http_build_query($send_params);
-        return  $url . $send_params;
-    }
-
-    public function getUsage() {
-        $client_id = $this->getClientId();
-        $url = '/staffapi/clients/' . $client_id . '/usage';
-        return $this->flApi->get($url);
-    }
-
-    public function getToken($user_id) {
-        $url = '/staffapi/users/' . $user_id . '/token';
-        $response = $this->flApi->post($url);
-        return $response['token'];
-    }
-
-    public function suspendOpenstack() {
-        $fleio_client_id = $this->getClientId();
-        if ($fleio_client_id != null) {
-            $url = '/staffapi/clients/' . $fleio_client_id . '/suspend';
-            return $this->flApi->post($url);
-        } else {
-            return "Unable to retrieve the Fleio client ID";
-        }
-    }
-
-    public function resumeOpenstack() {
-        $fleio_client_id = $this->getClientId();
-        if ($fleio_client_id != null) {
-            $url = '/staffapi/clients/' . $fleio_client_id . '/resume';
-            return $this->flApi->post($url);
-        } else {
-            return "Unable to retrieve the Fleio client ID";
-        }
-    }
-}
 
 /**
  * Client area output logic handling.
@@ -252,8 +171,10 @@ class Fleio {
  */
 function fleio_ClientArea(array $params)
 {
+    // Min/Max in base currency
     $min_amount = 10;
     $max_amount = 1000;
+    // Min/Max in client's currency
     $minamount = convertCurrency($min_amount, 1, $params['clientsdetails']['currency']);
     $maxamount = convertCurrency($max_amount, 1, $params['clientsdetails']['currency']);
 
@@ -268,39 +189,21 @@ function fleio_ClientArea(array $params)
         $templateFile = 'templates/overview.tpl';
         $exv2 = 'stats';
     }
-    if ($requestedAction == 'addflfunds') {
-        $serviceAction = 'addflfunds';
-        $exv2 = 'addflfunds';
-        $amount = $_REQUEST["amount"];
-        try {
-            $result = fleio_addFunds($amount, $minamount, $maxamount, $params);
-        } catch (Exception $e) {
-            $addfundserror = $e->getMessage();
-        } 
+    if ($requestedAction == 'createflinvoice') {
+        $serviceAction = 'actionCreateInvoice';
         $templateFile = 'templates/overview.tpl';
     } else {
-        $serviceAction = 'overview';
+        $serviceAction = 'actionOverview';
         $templateFile = 'templates/overview.tpl';
-        $exv2 = 'overview';
     }
     try {
         // Call the service's function based on the request action, using the
         // values provided by WHMCS in `$params`.
-        $response = array();
-        $fl = new Fleio($params);
-        $usage = $fl->getUsage();
-        $fleioUsage = $usage;
         return array(
             'tabOverviewReplacementTemplate' => $templateFile,
-            'templateVariables' => array(
-                'fleioUsage' => $fleioUsage,
-                'exv2' => $exv2,
-                'minamount' => $minamount,
-                'maxamount' => $maxamount,
-                "addfundserror" => $addfundserror,
-                "currency" => getCurrency($params['clientsdetails']['userid']),
-            ),
+            'templateVariables' => $serviceAction($params, $_REQUEST),
         );
+
     } catch (Exception $e) {
         // Record the error in WHMCS's module log.
         logModuleCall(
@@ -312,7 +215,7 @@ function fleio_ClientArea(array $params)
         );
         // In an error condition, display an error page.
         return array(
-            'tabOverviewReplacementTemplate' => 'error.tpl',
+            'tabOverviewReplacementTemplate' => 'templates/error.tpl',
             'templateVariables' => array(
                 'usefulErrorHelper' => $e->getMessage(),
             ),
@@ -321,7 +224,23 @@ function fleio_ClientArea(array $params)
 }
 
 
-function fleio_validateAmount($original_amount, $min, $max) {
+function actionOverview($params, $request) {
+    $min_amount = $params['configoption2'];
+    $max_amount = $params['configoption3'];
+    // Min/Max in client's currency
+    $minamount = convertCurrency($min_amount, 1, $params['clientsdetails']['currency']);
+    $maxamount = convertCurrency($max_amount, 1, $params['clientsdetails']['currency']);
+
+    $fl = Fleio::fromParams($params);
+    $usage = $fl->getUsage();
+    return array('fleioUsage' => $usage,
+                 'minamount' => $minamount,
+                 'maxamount' => $maxamount,
+                 'currency' => getCurrency($params['clientsdetails']['userid']));
+}
+
+
+function validateAmount($original_amount, $min, $max) {
     // Validate amount
     // Using , instead of . (dot) ?
     $amount = str_replace(",", ".", $original_amount);
@@ -340,20 +259,30 @@ function fleio_validateAmount($original_amount, $min, $max) {
 }
 
 
-function fleio_addFunds($original_amount, $min, $max, $params) {
-    $amount = fleio_validateAmount($original_amount, $min, $max);
+function actionCreateInvoice($params, $request) {
+    $min_amount = $params['configoption2'];
+    $max_amount = $params['configoption3'];
+    // Min/Max in client's currency
+    $minamount = convertCurrency($min_amount, 1, $params['clientsdetails']['currency']);
+    $maxamount = convertCurrency($max_amount, 1, $params['clientsdetails']['currency']);
+    
+    $original_amount = $request["amount"];
+    try { 
+        $amount = validateAmount($original_amount, $minamount, $maxamount);
+    } catch (Exception $e) {
+        $overview_vars = actionOverview($params, $request);
+        return array_merge($overview_vars, array('validateAmountError' => $e->getMessage(),));
+    }
     $clientsdetails = $params['clientsdetails'];
 
     $command = "createinvoice";
     $values["userid"] = $clientsdetails['userid'];
     $values["date"] = toMySQLDate(getTodaysDate());
     $values["duedate"] = toMySQLDate(getTodaysDate());
-    //$values["paymentmethod"] = $paymentmethod;
     $values["sendinvoice"] = false;
-    $values["itemdescription1"] = 'Openstack cloud services';
+    $values["itemdescription1"] = 'Fleio cloud services';
     $values["itemamount1"] = $amount;
     $values["itemtaxed1"] = true;
-    $values["notes"] = "fleio";
 
     $results = localAPI($command,$values,$ADMIN_USER);
 
@@ -361,10 +290,10 @@ function fleio_addFunds($original_amount, $min, $max, $params) {
         # Invoice created.
         $log_msg = "User ID: ".$clientsdetails['userid']." adding ".formatCurrency($amount)." as Fleio credit. Invoice ID: ".$results["invoiceid"];
         logActivity($log_msg);
-        //$table = "tblinvoiceitems";
-        //$update = array("type"=>"fleio");
-        //$where = array("invoiceid"=>$results["invoiceid"], "userid"=>$client->getID());
-        //update_query($table,$update,$where);
+        $table = "tblinvoiceitems";
+        $update = array("type"=>"fleio", "relid"=>$params['serviceid']);
+        $where = array("invoiceid"=>$results["invoiceid"], "userid"=>$clientsdetails['userid']);
+        update_query($table,$update,$where);
         redir("id=".(int)$results["invoiceid"],"viewinvoice.php");
     } else {
         throw new Exception($results["message"]);

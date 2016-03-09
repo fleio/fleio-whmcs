@@ -1,8 +1,192 @@
 <?php
 
+if (!defined("WHMCS")) {
+    die("This file cannot be accessed directly");
+}
+
+// see Laravel queries. WHMCS 6+ uses Capsule
+use Illuminate\Database\Capsule\Manager as Capsule;
+
 class FlApiException extends Exception {}
 class FlApiCurlException extends FlApiException {}
 class FlApiRequestException extends FlApiException {}
+
+
+class Fleio {
+    private $SERVER;
+    private $USER_PREFIX='whmcs';
+
+    public function __construct(stdClass $server, stdClass $clientsdetails) {
+        $this->SERVER = $server;
+        $this->clientsdetails = $clientsdetails;
+        $this->flApi = new FlApi($this->SERVER->url, $this->SERVER->token);
+    }
+
+    public static function fromParams(array $params) {
+        $server = new stdClass;
+        $server->url = 'https://' ? ($params['serversecure'] == 'fake') : 'http://';
+        $server->url .= empty($params['serverip']) ? $params['serverhostname'] : $params['serverip'];
+        $server->frontend_url .= empty($params['configoption1']) ? $params['serverhostname'] : $params['configoption1'];
+        $server->token = $params[ 'serveraccesshash' ];
+        $clientsdetails = (object) $params['clientsdetails'];
+        return new self($server, $clientsdetails);
+    }
+
+    public static function fromProdId($prodid) {
+        $prodid = (string) $prodid;
+        if (!is_string($prodid) or empty($prodid)) { // empty treats "0" as empty. We assume a product id will never be 0.
+            throw new FlApiException('Unable to initialize the fleio client.');
+        }
+        $clientsdetails = Capsule::table('tblclients')->join('tblhosting', 'tblhosting.userid', '=', 'tblclients.id')->where('tblhosting.id', '=', $prodid)->first();
+        $dbserver = Capsule::table('tblservers')
+            ->join('tblhosting', 'tblhosting.server', '=', 'tblservers.id')
+            ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
+            ->select('tblservers.*', 'tblproducts.*')
+            ->where('tblhosting.id', '=', $prodid)->first();
+        $server = new stdClass;
+        $server->url = 'https://' ? ($dbserver->secure == 'fake') : 'http://';
+        $server->url .= empty($dbserver->ipaddress) ? $dbserver->hostname : $dbserver->ipaddress;
+        $server->frontend_url .= empty($dbserver->configoption1) ? $server->ipaddress : $dbserver->configoption1;
+        $server->token = $dbserver->accesshash;
+        return new self($server, $clientsdetails);
+    }
+
+    public function testConnection() {
+        # TODO(tomo): Complete this function
+        $url = '/auth';
+    }
+
+    public function createUser() {
+        $url = '/staffapi/users';
+        $postf = array("username" => $this->USER_PREFIX . $this->clientsdetails->userid,
+            "email" => $this->clientsdetails->email,
+            "email_verified" => true,
+            "first_name" => $this->clientsdetails->firstname,
+            "last_name" => $this->clientsdetails->lastname,
+            "external_billing_id" => $this->clientsdetails->userid);
+        return $this->flApi->post($url, $postf);
+    }
+
+    public function createClient() {
+        $url = '/staffapi/clients';
+        $postfields = array('first_name' => $this->clientsdetails->firstname,
+             'last_name' => $this->clientsdetails->lastname,
+             'company' => $this->clientsdetails->company,
+             'address1' => $this->clientsdetails->address1,
+             'address2' => $this->clientsdetails->address2,
+             'city' => $this->clientsdetails->city,
+             'state' => $this->clientsdetails->state,
+             'country' => $this->clientsdetails->countrycode,
+             'zip_code' => $this->clientsdetails->postcode,
+             'phone' => $this->clientsdetails->phonenumber,
+             'fax' => $this->clientsdetails->fax,
+             'email' => $this->clientsdetails->email,
+             'external_billing_id' => $this->clientsdetails->userid);
+        return $this->flApi->post($url, $postfields);
+    }
+
+    private function getClientId() {
+        /* Get the Fleio client id from the WHMCS user id */
+        # TODO(tomo): throw if the clientId is not found
+        $url = '/staffapi/clients';
+        $query_params = array('external_billing_id' => $this->clientsdetails->userid);
+        $response = $this->flApi->get($url, $query_params);
+        if ($response == null) {
+            return null;
+        }
+        $objects = $response['objects'];
+        if (count($objects) > 1) {
+            return null; // Multiple objects returned
+        }
+        return $objects[0]['id'];
+    }
+
+    public function getUserId() {
+        $url = '/staffapi/users';
+        $query_params = array('external_billing_id' => $this->clientsdetails->userid);
+        $response = $this->flApi->get($url, $query_params);
+        if ($response == null) {
+            return null;
+        }
+        $objects = $response['objects'];
+        if (count($objects) > 1) {
+            return null;
+        }
+        return $objects[0]['id'];
+    }
+
+    public function addUserToClient($client_id, $user_id) {
+        $url = '/staffapi/clients/' . $client_id . '/add_user';
+        $postfields = array('user' => $user_id, 'client' => $client_id);
+        return $this->flApi->post($url, $postfields);
+    }
+
+    private function getSSOSession() {
+        $url = '/staffapi/auth/get_sso_session';
+        $params = array('euid' => $this->clientsdetails->userid);
+        return $this->flApi->post($url, $params);
+    }
+
+    public function getSSOUrl() {
+        $euid = $this->clientsdetails->userid;
+        $url = $this->SERVER->frontend_url . '/sso?';
+        $rsp = $this->getSSOSession();
+        $params = array( 'euid', 'timestamp', 'hash_val' );
+        $send_params = array_combine($params, explode(":", $rsp['hash_val']));
+        $send_params = http_build_query($send_params);
+        return  $url . $send_params;
+    }
+
+    public function getUsage() {
+        $client_id = $this->getClientId();
+        $url = '/staffapi/clients/' . $client_id . '/usage';
+        return $this->flApi->get($url);
+    }
+
+    public function getToken($user_id) {
+        $url = '/staffapi/users/' . $user_id . '/token';
+        $response = $this->flApi->post($url);
+        return $response['token'];
+    }
+
+    public function suspendOpenstack() {
+        $fleio_client_id = $this->getClientId();
+        if ($fleio_client_id != null) {
+            $url = '/staffapi/clients/' . $fleio_client_id . '/suspend';
+            return $this->flApi->post($url);
+        } else {
+            return "Unable to retrieve the Fleio client ID";
+        }
+    }
+
+    public function resumeOpenstack() {
+        $fleio_client_id = $this->getClientId();
+        if ($fleio_client_id != null) {
+            $url = '/staffapi/clients/' . $fleio_client_id . '/resume';
+            return $this->flApi->post($url);
+        } else {
+            return "Unable to retrieve the Fleio client ID";
+        }
+    }
+
+    public function terminateOpenstack() {
+        $fleio_client_id = $this->getClientId();
+        //if ($fleio_client_id != null) {
+            $url = '/staffapi/clients/' . $fleio_client_id . '/terminate';
+            return $this->flApi->post($url);
+       // }
+    }
+
+    public function updateCredit($amount, $currencyCode, $currencyRate, $convertedAmount) {
+        $fleio_client_id = $this->getClientId();
+        $url = '/staffapi/clients/' . $fleio_client_id . '/update_credit';
+        $params = array('amount' => $amount,
+                        'currency' => $currencyCode,
+                        'rate' => $currencyRate,
+                        'converted_amount' => $convertedAmount);
+        return $this->flApi->post($url, $params); 
+    }
+}
 
 
 class FlApi {

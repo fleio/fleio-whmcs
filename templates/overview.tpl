@@ -8,7 +8,7 @@
                 <h4>Fleio balance: {$fleioUsage.available_balance}</h4>
                 <div class="col-lg-8 col-lg-offset-2">
                     <form role="form" method="post" action="clientarea.php?action=productdetails&id={$serviceid}">
-                        <input type="hidden" name="customAction" value="addflfunds" />
+                        <input type="hidden" name="customAction" value="createflinvoice" />
                         <div class="input-group">
                             <span class="input-group-addon">{$currency.code}</span>
                             <input name="amount" type="number" min="{$minamount}" step="0.01" max="{$maxamount}" value="{$minamount}" class="form-control text-right">
@@ -19,8 +19,8 @@
                     </form>
                 </div>
             </div>
-           {if $addfundserror}
-            <div class="text-danger text-center limit-near">{$addfundserror}</div>
+           {if $validateAmountError}
+            <div class="text-danger text-center limit-near">{$validateAmountError}</div>
            {/if}
        </div>
     </div>
