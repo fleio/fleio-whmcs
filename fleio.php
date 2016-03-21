@@ -85,7 +85,7 @@ function fleio_TerminateAccount($params) {
         logactivity($e->getMessage());
         return "Unable to terminate the account. See the activity logs for details.";
     }
-    return "Not implemented";
+    return "success";
 }
 
 function fleio_login($params) {

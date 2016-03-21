@@ -92,11 +92,11 @@ class Fleio {
         $query_params = array('external_billing_id' => $this->clientsdetails->userid);
         $response = $this->flApi->get($url, $query_params);
         if ($response == null) {
-            return null;
+            throw new FlApiRequestException("Unable to retrieve the Fleio client ID", 404);
         }
         $objects = $response['objects'];
         if (count($objects) > 1) {
-            return null; // Multiple objects returned
+            throw new FlApiRequestException("Unable to retrieve the Fleio client ID", 409);; // Multiple objects returned
         }
         return $objects[0]['id'];
     }
@@ -151,30 +151,20 @@ class Fleio {
 
     public function suspendOpenstack() {
         $fleio_client_id = $this->getClientId();
-        if ($fleio_client_id != null) {
-            $url = '/staffapi/clients/' . $fleio_client_id . '/suspend';
-            return $this->flApi->post($url);
-        } else {
-            return "Unable to retrieve the Fleio client ID";
-        }
+        $url = '/staffapi/clients/' . $fleio_client_id . '/suspend';
+        return $this->flApi->post($url);
     }
 
     public function resumeOpenstack() {
         $fleio_client_id = $this->getClientId();
-        if ($fleio_client_id != null) {
-            $url = '/staffapi/clients/' . $fleio_client_id . '/resume';
-            return $this->flApi->post($url);
-        } else {
-            return "Unable to retrieve the Fleio client ID";
-        }
+        $url = '/staffapi/clients/' . $fleio_client_id . '/resume';
+        return $this->flApi->post($url);
     }
 
     public function terminateOpenstack() {
         $fleio_client_id = $this->getClientId();
-        //if ($fleio_client_id != null) {
-            $url = '/staffapi/clients/' . $fleio_client_id . '/terminate';
-            return $this->flApi->post($url);
-       // }
+        $url = '/staffapi/clients/' . $fleio_client_id . '/terminate';
+        return $this->flApi->post($url);
     }
 
     public function updateCredit($amount, $currencyCode, $currencyRate, $convertedAmount) {
