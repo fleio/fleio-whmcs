@@ -6,6 +6,19 @@ if (!defined("WHMCS")) {
 
 require_once __DIR__ . '/api.php';
 
+function fleio_MetaData()
+{
+    return array(
+        'DisplayName' => 'Fleio',
+        'APIVersion' => '1.0',
+        'RequiresServer' => true, // Set true if module requires a server to work
+        'DefaultNonSSLPort' => '80',
+        'DefaultSSLPort' => '443',
+        'ServiceSingleSignOnLabel' => 'Login to Fleio',
+        'AdminSingleSignOnLabel' => 'Login to Fleio',
+    );
+}
+
 function fleio_ConfigOptions() {
     global $_LANG;
     $configarray = array(
@@ -293,6 +306,7 @@ function actionCreateInvoice($params, $request) {
         $table = "tblinvoiceitems";
         $update = array("type"=>"fleio", "relid"=>$params['serviceid']);
         $where = array("invoiceid"=>$results["invoiceid"], "userid"=>$clientsdetails['userid']);
+        //TODO(tomo): Use Capsule instead of update_query
         update_query($table,$update,$where);
         redir("id=".(int)$results["invoiceid"],"viewinvoice.php");
     } else {
