@@ -10,8 +10,8 @@ function fleio_MetaData()
 {
     return array(
         'DisplayName' => 'Fleio',
-        'APIVersion' => '1.0',
-        'RequiresServer' => true, // Set true if module requires a server to work
+        'APIVersion' => '1.1',
+        'RequiresServer' => false, // Set true if module requires a server to work
         'DefaultNonSSLPort' => '80',
         'DefaultSSLPort' => '443',
         'ServiceSingleSignOnLabel' => 'Login to Fleio',
@@ -22,8 +22,28 @@ function fleio_MetaData()
 function fleio_ConfigOptions() {
     global $_LANG;
     $configarray = array(
+    "admintoken" => array (
+        "FriendlyName" => "Fleio Token",
+        "Type" => "password", # Password Field
+        "Size" => "64", # Defines the Field Width
+        "Default" => "",
+    ),
     "frontendurl" => array (
-        "FriendlyName" => "Fleio Frontend",
+        "FriendlyName" => "Frontend URL",
+        "Type" => "text", # Text Box
+        "Size" => "64", # Defines the Field Width
+        "Description" => "",
+        "Default" => "https://",
+    ),
+    "frontendadminurl" => array (
+        "FriendlyName" => "Frontend admin URL",
+        "Type" => "text", # Text Box
+        "Size" => "64", # Defines the Field Width
+        "Description" => "",
+        "Default" => "https://",
+    ),
+    "backendadminurl" => array (
+        "FriendlyName" => "Backend admin URL",
         "Type" => "text", # Text Box
         "Size" => "64", # Defines the Field Width
         "Description" => "",
@@ -53,6 +73,7 @@ function fleio_CreateAccount( $params ) {
         $fl_user = $fl->createUser();
         $client = $fl->createClient();
         $utoc = $fl->addUserToClient($client['id'], $fl_user['id']);
+        $project = $fl->createOpenstackProject($client['id']);
     } catch (FlApiException $e) {
         return $e->getMessage();
     }
@@ -99,50 +120,6 @@ function fleio_login($params) {
         return "Unable to retrieve a SSO session";
     }
 }
-
-function fleio_TestConnection(array $params)
-{
-    try {
-        // Call the service's connection test function.
-        $fl = Fleio::fromParams($params);
-        $fl->testConnection(); 
-        $success = false;
-        $errorMsg = 'TestConnection not implemented in module';
-    } catch (Exception $e) {
-        // Record the error in WHMCS's module log.
-        logModuleCall(
-            'provisioningmodule',
-            __FUNCTION__,
-            $params,
-            $e->getMessage(),
-            $e->getTraceAsString()
-        );
-        $success = false;
-        $errorMsg = $e->getMessage();
-    }
-    return array(
-        'success' => $success,
-        'error' => $errorMsg,
-    );
-}
-
-
-function fleio_ServiceSingleSignOn($params) {
-    $fl = Fleio::fromParams($params);
-    try {
-        $url = $fl->getSSOUrl();
-        return array("success" => true, "redirectTo" => $url);
-    } catch (FlApiException $e) {
-        //TODO(tomo): Handle the $e->getMessage() message
-        return array("success" => false, "errorMsg" => "Unable to retrieve a SSO session");
-    }
-}
-
-
-function fleio_AdminLink( $params ) {
-    return "AdminLink not implemented";
-}
-
 
 function fleio_ClientAreaCustomButtonArray() {
     $buttonarray = array(
@@ -238,8 +215,8 @@ function fleio_ClientArea(array $params)
 
 
 function actionOverview($params, $request) {
-    $min_amount = $params['configoption2'];
-    $max_amount = $params['configoption3'];
+    $min_amount = $params['configoption5'];
+    $max_amount = $params['configoption6'];
     // Min/Max in client's currency
     $minamount = convertCurrency($min_amount, 1, $params['clientsdetails']['currency']);
     $maxamount = convertCurrency($max_amount, 1, $params['clientsdetails']['currency']);
@@ -273,8 +250,8 @@ function validateAmount($original_amount, $min, $max) {
 
 
 function actionCreateInvoice($params, $request) {
-    $min_amount = $params['configoption2'];
-    $max_amount = $params['configoption3'];
+    $min_amount = $params['configoption5'];
+    $max_amount = $params['configoption6'];
     // Min/Max in client's currency
     $minamount = convertCurrency($min_amount, 1, $params['clientsdetails']['currency']);
     $maxamount = convertCurrency($max_amount, 1, $params['clientsdetails']['currency']);

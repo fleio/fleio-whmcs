@@ -24,10 +24,9 @@ class Fleio {
 
     public static function fromParams(array $params) {
         $server = new stdClass;
-        $server->url = 'https://' ? ($params['serversecure'] == 'fake') : 'http://';
-        $server->url .= empty($params['serverip']) ? $params['serverhostname'] : $params['serverip'];
-        $server->frontend_url .= empty($params['configoption1']) ? $params['serverhostname'] : $params['configoption1'];
-        $server->token = $params[ 'serveraccesshash' ];
+        $server->url = $params['configoption4'];
+        $server->frontend_url = $params['configoption2'];
+        $server->token = $params[ 'configoption1' ];
         $clientsdetails = (object) $params['clientsdetails'];
         return new self($server, $clientsdetails);
     }
@@ -38,16 +37,13 @@ class Fleio {
             throw new FlApiException('Unable to initialize the fleio client.');
         }
         $clientsdetails = Capsule::table('tblclients')->join('tblhosting', 'tblhosting.userid', '=', 'tblclients.id')->where('tblhosting.id', '=', $prodid)->first();
-        $dbserver = Capsule::table('tblservers')
-            ->join('tblhosting', 'tblhosting.server', '=', 'tblservers.id')
+        $dbserver = Capsule::table('tblhosting')
             ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
-            ->select('tblservers.*', 'tblproducts.*')
             ->where('tblhosting.id', '=', $prodid)->first();
         $server = new stdClass;
-        $server->url = 'https://' ? ($dbserver->secure == 'fake') : 'http://';
-        $server->url .= empty($dbserver->ipaddress) ? $dbserver->hostname : $dbserver->ipaddress;
-        $server->frontend_url .= empty($dbserver->configoption1) ? $server->ipaddress : $dbserver->configoption1;
-        $server->token = $dbserver->accesshash;
+        $server->url = $dbserver->configoption4;
+        $server->frontend_url = $dbserver->configoption2;
+        $server->token = $dbserver->configoption1;
         return new self($server, $clientsdetails);
     }
 
@@ -57,7 +53,7 @@ class Fleio {
     }
 
     public function createUser() {
-        $url = '/staffapi/users';
+        $url = '/users';
         $postf = array("username" => $this->USER_PREFIX . $this->clientsdetails->userid,
             "email" => $this->clientsdetails->email,
             "email_verified" => true,
@@ -68,7 +64,7 @@ class Fleio {
     }
 
     public function createClient() {
-        $url = '/staffapi/clients';
+        $url = '/clients';
         $postfields = array('first_name' => $this->clientsdetails->firstname,
              'last_name' => $this->clientsdetails->lastname,
              'company' => $this->clientsdetails->company,
@@ -85,10 +81,16 @@ class Fleio {
         return $this->flApi->post($url, $postfields);
     }
 
+    public function createOpenstackProject($clientid) {
+        $url = '/openstack/projects';
+        $postfields = array('client' => $clientid);
+        return $this->flApi->post($url, $postfields);
+    }
+
     private function getClientId() {
         /* Get the Fleio client id from the WHMCS user id */
         # TODO(tomo): throw if the clientId is not found
-        $url = '/staffapi/clients';
+        $url = '/clients';
         $query_params = array('external_billing_id' => $this->clientsdetails->userid);
         $response = $this->flApi->get($url, $query_params);
         if ($response == null) {
@@ -102,7 +104,7 @@ class Fleio {
     }
 
     public function getUserId() {
-        $url = '/staffapi/users';
+        $url = '/users';
         $query_params = array('external_billing_id' => $this->clientsdetails->userid);
         $response = $this->flApi->get($url, $query_params);
         if ($response == null) {
@@ -116,13 +118,13 @@ class Fleio {
     }
 
     public function addUserToClient($client_id, $user_id) {
-        $url = '/staffapi/clients/' . $client_id . '/add_user';
+        $url = '/clients/' . $client_id . '/add_user';
         $postfields = array('user' => $user_id, 'client' => $client_id);
         return $this->flApi->post($url, $postfields);
     }
 
     private function getSSOSession() {
-        $url = '/staffapi/auth/get_sso_session';
+        $url = '/auth/get_sso_session';
         $params = array('euid' => $this->clientsdetails->userid);
         return $this->flApi->post($url, $params);
     }
@@ -139,37 +141,37 @@ class Fleio {
 
     public function getUsage() {
         $client_id = $this->getClientId();
-        $url = '/staffapi/clients/' . $client_id . '/usage';
+        $url = '/clients/' . $client_id . '/usage';
         return $this->flApi->get($url);
     }
 
     public function getToken($user_id) {
-        $url = '/staffapi/users/' . $user_id . '/token';
+        $url = '/users/' . $user_id . '/token';
         $response = $this->flApi->post($url);
         return $response['token'];
     }
 
     public function suspendOpenstack() {
         $fleio_client_id = $this->getClientId();
-        $url = '/staffapi/clients/' . $fleio_client_id . '/suspend';
+        $url = '/clients/' . $fleio_client_id . '/suspend';
         return $this->flApi->post($url);
     }
 
     public function resumeOpenstack() {
         $fleio_client_id = $this->getClientId();
-        $url = '/staffapi/clients/' . $fleio_client_id . '/resume';
+        $url = '/clients/' . $fleio_client_id . '/resume';
         return $this->flApi->post($url);
     }
 
     public function terminateOpenstack() {
         $fleio_client_id = $this->getClientId();
-        $url = '/staffapi/clients/' . $fleio_client_id . '/terminate';
+        $url = '/clients/' . $fleio_client_id . '/terminate';
         return $this->flApi->post($url);
     }
 
     public function updateCredit($amount, $currencyCode, $currencyRate, $convertedAmount) {
         $fleio_client_id = $this->getClientId();
-        $url = '/staffapi/clients/' . $fleio_client_id . '/update_credit';
+        $url = '/clients/' . $fleio_client_id . '/update_credit';
         $params = array('amount' => $amount,
                         'currency' => $currencyCode,
                         'rate' => $currencyRate,
