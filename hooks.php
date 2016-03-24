@@ -6,10 +6,12 @@ if (!defined("WHMCS")) {
 
 require_once __DIR__ . '/api.php';
 use Illuminate\Database\Capsule\Manager as Capsule;
+use WHMCS\View\Menu\Item as MenuItem;
 
 add_hook("InvoicePaid", 99, "openstack_add_funds_hook", "");
 add_hook("InvoiceUnpaid", 99, "openstack_del_credit_hook");
 add_hook("InvoiceRefunded", 99, "openstack_del_credit_hook");
+add_hook("ClientAreaPrimarySidebar", 99, "fleio_ClientAreaPrimaryNavbar");
 
 function openstack_change_funds($invoiceid, $substract=False) {
     $items = Capsule::table('tblinvoiceitems')->where('invoiceid', '=', $invoiceid)->get();
@@ -48,3 +50,14 @@ function openstack_del_credit_hook($vars) {
     openstack_change_funds($vars["invoiceid"], True);
 }
 
+function fleio_ClientAreaPrimaryNavbar(MenuItem $pn) {
+    $actionsNav = $pn->getChild("Service Details Actions");
+    if (is_null($actionsNav)) {
+        return;
+    }
+    logActivity($type);
+    $navItem = $actionsNav->getChild('Custom Module Button Login to Fleio');
+    if (!is_null($navItem)) {
+        $navItem->setAttribute("target", '_blank');
+    }
+}

@@ -5,6 +5,7 @@ if (!defined("WHMCS")) {
 }
 
 require_once __DIR__ . '/api.php';
+use Illuminate\Database\Capsule\Manager as Capsule;
 
 function fleio_MetaData()
 {
@@ -280,11 +281,10 @@ function actionCreateInvoice($params, $request) {
         # Invoice created.
         $log_msg = "User ID: ".$clientsdetails['userid']." adding ".formatCurrency($amount)." as Fleio credit. Invoice ID: ".$results["invoiceid"];
         logActivity($log_msg);
-        $table = "tblinvoiceitems";
-        $update = array("type"=>"fleio", "relid"=>$params['serviceid']);
-        $where = array("invoiceid"=>$results["invoiceid"], "userid"=>$clientsdetails['userid']);
-        //TODO(tomo): Use Capsule instead of update_query
-        update_query($table,$update,$where);
+        Capsule::table('tblinvoiceitems')
+            ->where('invoiceid', $results['invoiceid'])
+            ->where('userid', $clientsdetails['userid'])
+            ->update(array("type"=>"fleio", "relid"=>$params['serviceid']));
         redir("id=".(int)$results["invoiceid"],"viewinvoice.php");
     } else {
         throw new Exception($results["message"]);
