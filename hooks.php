@@ -44,11 +44,21 @@ function openstack_change_funds($invoiceid, $substract=False) {
 
 
 function openstack_add_funds_hook($vars) {
-    openstack_change_funds($vars["invoiceid"]);
+    # Ignore the invoice if it's related to a fleio product creation (the initial invoice).
+    # TODO(tomo): Find a better way. This is here to avoid a double credit addition triggerd by InvoicePaid and PostServiceCreate events
+    $order = Capsule::table('tblorders')->where('invoiceid', '=', $vars["invoiceid"])->first();
+    if (!isset($order)) {
+        openstack_change_funds($vars["invoiceid"]);
+    }
 }
 
 function openstack_del_credit_hook($vars) {
-    openstack_change_funds($vars["invoiceid"], True);
+    # Ignore the invoice if it's related to a fleio product creation (the initial invoice).
+    # TODO(tomo): Find a better way. This is here to avoid a double credit addition triggerd by InvoicePaid and PostServiceCreate events
+    $order = Capsule::table('tblorders')->where('invoiceid', '=', $vars["invoiceid"])->first();
+    if (!isset($order)) {
+       openstack_change_funds($vars["invoiceid"], True);
+    }
 }
 
 function fleio_ClientAreaPrimaryNavbar(MenuItem $pn) {
@@ -78,6 +88,8 @@ function openstack_add_initial_credit($vars) {
             ->where('invoiceid', (string) $invoice->id)
             ->where('relid', (string) $params['serviceid'])
             ->update(array("type"=>"fleio")); 
-    logActivity("Adding initial Fleio credit from Invoice ID: " . (string) $invoice->id);
-    openstack_change_funds($invoice->id);
+    if ($invoice->status == 'Paid') {
+        logActivity("Adding initial Fleio credit from Invoice ID: " . (string) $invoice->id);
+        openstack_change_funds($invoice->id);
+    }
 }

@@ -47,11 +47,6 @@ class Fleio {
         return new self($server, $clientsdetails);
     }
 
-    public function testConnection() {
-        # TODO(tomo): Complete this function
-        $url = '/auth';
-    }
-
     public function createBillingClient($currencyCode) {
         $url = '/openstack/billing/create_billing_client';
         $user = array("username" => $this->USER_PREFIX . $this->clientsdetails->userid,
