@@ -11,6 +11,7 @@ use WHMCS\View\Menu\Item as MenuItem;
 add_hook("InvoicePaid", 99, "openstack_add_funds_hook", "");
 add_hook("InvoiceUnpaid", 99, "openstack_del_credit_hook");
 add_hook("InvoiceRefunded", 99, "openstack_del_credit_hook");
+add_hook("AfterModuleCreate", 99, "openstack_add_initial_credit");
 add_hook("ClientAreaPrimarySidebar", 99, "fleio_ClientAreaPrimaryNavbar");
 
 function openstack_change_funds($invoiceid, $substract=False) {
@@ -19,15 +20,15 @@ function openstack_change_funds($invoiceid, $substract=False) {
         if ($item->type == 'fleio') {
             $currency = getCurrency($item->userid);
             $defaultCurrency = getCurrency();
-            $amount = $item->amount;
-            $convertedAmount = convertCurrency($amount, $currency['id']);
+            $convertedAmount = $item->amount; // Amount in client's currency
+            $amount = convertCurrency($convertedAmount, $currency['id']);  // Amount in default currency
             if ($substract) {
-                $converted_amount = (-1 * $converted_amount);
+                $convertedAmount = (-1 * $convertedAmount);
                 $amount = (-1 * $amount);
             }
             $fl = Fleio::fromProdId($item->relid);
             $msg_format = "Changing Fleio credit for WHMCS User ID: %s with %.02f %s (%.02f %s from Invoice ID: %s)";
-            $msg = sprintf($msg_format, $item->userid, $convertedAmount, $defaultCurrency["code"], $amount, $currency["code"], $invoiceid);
+            $msg = sprintf($msg_format, $item->userid, $amount, $defaultCurrency["code"], $convertedAmount, $currency["code"], $invoiceid);
             logActivity($msg);
             # TODO(tomo): We use the userid which can be a contact ?
             try {
@@ -36,7 +37,7 @@ function openstack_change_funds($invoiceid, $substract=False) {
                 logActivity("Unable to update the client credit in Fleio: " . $e->getMessage()); 
                 return;
             }
-            logActivity("Successfully changed credit with ".$convertedAmount." ".$defaultCurrency["code"]." for Fleio client id: ".$response['client'].". New Fleio balance: ".$response['credit_balance']); 
+            logActivity("Successfully changed credit with ".$amount." ".$defaultCurrency["code"]." for Fleio client id: ".$response['client'].". New Fleio balance: ".$response['credit_balance']); 
         }
     }
 }
@@ -55,9 +56,28 @@ function fleio_ClientAreaPrimaryNavbar(MenuItem $pn) {
     if (is_null($actionsNav)) {
         return;
     }
-    logActivity($type);
     $navItem = $actionsNav->getChild('Custom Module Button Login to Fleio');
     if (!is_null($navItem)) {
         $navItem->setAttribute("target", '_blank');
     }
+}
+
+function openstack_add_initial_credit($vars) {
+    $params = $vars['params'];
+    if ($params['moduletype'] != "fleio") { return ""; }
+    $invoice = Capsule::table('tblhosting')
+        ->join('tblorders', 'tblorders.id', '=', 'tblhosting.orderid')
+        ->join('tblinvoices', 'tblorders.invoiceid', '=', 'tblinvoices.id')
+        ->where('tblhosting.id', '=', (string) $params['serviceid'])
+        ->select('tblinvoices.*')
+        ->first();
+    if (!isset($invoice->id)) {
+        return "";
+    }
+    Capsule::table('tblinvoiceitems')
+            ->where('invoiceid', (string) $invoice->id)
+            ->where('relid', (string) $params['serviceid'])
+            ->update(array("type"=>"fleio")); 
+    logActivity("Adding initial Fleio credit from Invoice ID: " . (string) $invoice->id);
+    openstack_change_funds($invoice->id);
 }
