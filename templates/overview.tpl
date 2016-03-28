@@ -5,7 +5,7 @@
                 <h3 class="panel-title">Available credit</h3>
             </div>
             <div class="panel-body text-center">
-                <h4>Fleio balance: {$fleioUsage.available_balance}</h4>
+                <h4>Fleio balance: {$clientCredit.credit} {$clientCredit.currency}</h4>
                 <div class="col-lg-8 col-lg-offset-2">
                     <form role="form" method="post" action="clientarea.php?action=productdetails&id={$serviceid}">
                         <input type="hidden" name="customAction" value="createflinvoice" />

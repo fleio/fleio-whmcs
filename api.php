@@ -52,7 +52,7 @@ class Fleio {
         $url = '/auth';
     }
 
-    public function createBillingClient() {
+    public function createBillingClient($currencyCode) {
         $url = '/openstack/billing/create_billing_client';
         $user = array("username" => $this->USER_PREFIX . $this->clientsdetails->userid,
             "email" => $this->clientsdetails->email,
@@ -72,7 +72,8 @@ class Fleio {
              'phone' => $this->clientsdetails->phonenumber,
              'fax' => $this->clientsdetails->fax,
              'email' => $this->clientsdetails->email,
-             'external_billing_id' => $this->clientsdetails->userid);
+             'external_billing_id' => $this->clientsdetails->userid,
+             'currency' => $currencyCode);
         $postfields = array("user" => $user, "client" => $client);
         return $this->flApi->post($url, $postfields);
     }    
@@ -167,6 +168,13 @@ class Fleio {
     public function getUsage() {
         $client_id = $this->getClientId();
         $url = '/clients/' . $client_id . '/usage';
+        return $this->flApi->get($url);
+    }
+
+    public function getClientRamainingCredit() {
+        # Return the client's remainig credit and currency code
+        $client_id = $this->getClientId();
+        $url = '/openstack/billing/' . $client_id . '/credit_balance';
         return $this->flApi->get($url);
     }
 

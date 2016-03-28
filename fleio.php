@@ -70,8 +70,9 @@ function fleio_ConfigOptions() {
 
 function fleio_CreateAccount($params){
     $fl = Fleio::fromParams($params);
+    $defaultCurrency = getCurrency();
     try {
-        $fl->createBillingClient();
+        $fl->createBillingClient($defaultCurrency['code']);
     } catch (FlApiException $e) {
         return $e->getMessage();
     }
@@ -220,8 +221,8 @@ function actionOverview($params, $request) {
     $maxamount = convertCurrency($max_amount, 1, $params['clientsdetails']['currency']);
 
     $fl = Fleio::fromParams($params);
-    $usage = $fl->getUsage();
-    return array('fleioUsage' => $usage,
+    $client_credit = $fl->getClientRamainingCredit();
+    return array('clientCredit' => $client_credit,
                  'minamount' => $minamount,
                  'maxamount' => $maxamount,
                  'currency' => getCurrency($params['clientsdetails']['userid']));
