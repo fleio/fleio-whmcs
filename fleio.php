@@ -68,13 +68,10 @@ function fleio_ConfigOptions() {
     return $configarray;
 }
 
-function fleio_CreateAccount( $params ) {
-    $fl = Fleio::fromParams( $params );
+function fleio_CreateAccount($params){
+    $fl = Fleio::fromParams($params);
     try {
-        $fl_user = $fl->createUser();
-        $client = $fl->createClient();
-        $utoc = $fl->addUserToClient($client['id'], $fl_user['id']);
-        $project = $fl->createOpenstackProject($client['id']);
+        $fl->createBillingClient();
     } catch (FlApiException $e) {
         return $e->getMessage();
     }

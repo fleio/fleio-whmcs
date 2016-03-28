@@ -52,6 +52,31 @@ class Fleio {
         $url = '/auth';
     }
 
+    public function createBillingClient() {
+        $url = '/openstack/billing/create_billing_client';
+        $user = array("username" => $this->USER_PREFIX . $this->clientsdetails->userid,
+            "email" => $this->clientsdetails->email,
+            "email_verified" => true,
+            "first_name" => $this->clientsdetails->firstname,
+            "last_name" => $this->clientsdetails->lastname,
+            "external_billing_id" => $this->clientsdetails->userid);
+        $client = array('first_name' => $this->clientsdetails->firstname,
+             'last_name' => $this->clientsdetails->lastname,
+             'company' => $this->clientsdetails->company,
+             'address1' => $this->clientsdetails->address1,
+             'address2' => $this->clientsdetails->address2,
+             'city' => $this->clientsdetails->city,
+             'state' => $this->clientsdetails->state,
+             'country' => $this->clientsdetails->countrycode,
+             'zip_code' => $this->clientsdetails->postcode,
+             'phone' => $this->clientsdetails->phonenumber,
+             'fax' => $this->clientsdetails->fax,
+             'email' => $this->clientsdetails->email,
+             'external_billing_id' => $this->clientsdetails->userid);
+        $postfields = array("user" => $user, "client" => $client);
+        return $this->flApi->post($url, $postfields);
+    }    
+
     public function createUser() {
         $url = '/users';
         $postf = array("username" => $this->USER_PREFIX . $this->clientsdetails->userid,
