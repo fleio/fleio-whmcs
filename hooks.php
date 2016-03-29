@@ -12,7 +12,7 @@ add_hook("InvoicePaid", 99, "openstack_add_funds_hook", "");
 add_hook("InvoiceUnpaid", 99, "openstack_del_credit_hook");
 add_hook("InvoiceRefunded", 99, "openstack_del_credit_hook");
 add_hook("AfterModuleCreate", 99, "openstack_add_initial_credit");
-add_hook("ClientAreaPrimarySidebar", 99, "fleio_ClientAreaPrimaryNavbar");
+add_hook("ClientAreaPrimarySidebar", 99, "fleio_ClientAreaPrimarySidebar");
 
 function openstack_change_funds($invoiceid, $substract=False) {
     $items = Capsule::table('tblinvoiceitems')->where('invoiceid', '=', $invoiceid)->get();
@@ -61,7 +61,7 @@ function openstack_del_credit_hook($vars) {
     }
 }
 
-function fleio_ClientAreaPrimaryNavbar(MenuItem $pn) {
+function fleio_ClientAreaPrimarySidebar(MenuItem $pn) {
     $actionsNav = $pn->getChild("Service Details Actions");
     if (is_null($actionsNav)) {
         return;
