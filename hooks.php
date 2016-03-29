@@ -13,6 +13,7 @@ add_hook("InvoiceUnpaid", 99, "openstack_del_credit_hook");
 add_hook("InvoiceRefunded", 99, "openstack_del_credit_hook");
 add_hook("AfterModuleCreate", 99, "openstack_add_initial_credit");
 add_hook("ClientAreaPrimarySidebar", 99, "fleio_ClientAreaPrimarySidebar");
+add_hook("ClientAreaPrimaryNavbar", 99, "fleio_ClientAreaPrimaryNavbar");
 
 function openstack_change_funds($invoiceid, $substract=False) {
     $items = Capsule::table('tblinvoiceitems')->where('invoiceid', '=', $invoiceid)->get();
