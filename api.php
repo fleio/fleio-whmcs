@@ -145,7 +145,7 @@ class Fleio {
     }
 
     private function getSSOSession() {
-        $url = '/auth/get_sso_session';
+        $url = '/get-sso-session';
         $params = array('euid' => $this->clientsdetails->userid);
         return $this->flApi->post($url, $params);
     }
