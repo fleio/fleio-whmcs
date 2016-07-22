@@ -70,9 +70,8 @@ function fleio_ConfigOptions() {
 
 function fleio_CreateAccount($params){
     $fl = Fleio::fromParams($params);
-    $defaultCurrency = getCurrency();
     try {
-        $fl->createBillingClient($defaultCurrency['code']);
+        $fl->createBillingClient();
     } catch (FlApiException $e) {
         return $e->getMessage();
     }

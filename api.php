@@ -47,7 +47,7 @@ class Fleio {
         return new self($server, $clientsdetails);
     }
 
-    public function createBillingClient($currencyCode) {
+    public function createBillingClient() {
         $url = '/openstack/billing/create_billing_client';
         $user = array("username" => $this->USER_PREFIX . $this->clientsdetails->userid,
             "email" => $this->clientsdetails->email,
@@ -68,7 +68,7 @@ class Fleio {
              'fax' => $this->clientsdetails->fax,
              'email' => $this->clientsdetails->email,
              'external_billing_id' => $this->clientsdetails->userid,
-             'currency' => $currencyCode);
+             'currency' => getCurrency($this->clientsdetails->userid)['code']);
         $postfields = array("user" => $user, "client" => $client);
         return $this->flApi->post($url, $postfields);
     }    
