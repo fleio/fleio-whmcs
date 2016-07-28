@@ -68,7 +68,7 @@ class Fleio {
              'fax' => $this->clientsdetails->fax,
              'email' => $this->clientsdetails->email,
              'external_billing_id' => $this->clientsdetails->userid,
-             'currency' => getCurrency($this->clientsdetails->userid)['code']);
+             'currency' => getCurrency()['code']);
         $postfields = array("user" => $user, "client" => $client);
         return $this->flApi->post($url, $postfields);
     }    

@@ -29,7 +29,7 @@ function openstack_change_funds($invoiceid, $substract=False) {
             }
             $fl = Fleio::fromProdId($item->relid);
             $msg_format = "Changing Fleio credit for WHMCS User ID: %s with %.02f %s (%.02f %s from Invoice ID: %s)";
-            $msg = sprintf($msg_format, $item->userid, $convertedAmount, $currency["code"], $amount, $defaultCurrency["code"], $invoiceid);
+            $msg = sprintf($msg_format, $item->userid, $amount, $defaultCurrency["code"], $convertedAmount, $currency["code"], $invoiceid);
             logActivity($msg);
             # TODO(tomo): We use the userid which can be a contact ?
             try {
@@ -38,7 +38,7 @@ function openstack_change_funds($invoiceid, $substract=False) {
                 logActivity("Unable to update the client credit in Fleio: " . $e->getMessage()); 
                 return;
             }
-            logActivity("Successfully changed credit with ".$convertedAmount." ".$currency["code"]." for Fleio client id: ".$response['client'].". New Fleio balance: ".$response['credit_balance']); 
+            logActivity("Successfully changed credit with ".$amount." ".$defaultCurrency["code"]." for Fleio client id: ".$response['client'].". New Fleio balance: ".$response['credit_balance']); 
         }
     }
 }
