@@ -85,6 +85,7 @@ function fleio_SuspendAccount($params) {
     } catch (FlApiException $e) {
         return $e->getMessage();
     }
+    return "success";
 }
 
 function fleio_UnsuspendAccount($params) {
@@ -94,6 +95,7 @@ function fleio_UnsuspendAccount($params) {
     } catch (FlApiException $e) {
         return $e->getMessage();
     }
+    return "success";
 }
 
 function fleio_TerminateAccount($params) {
