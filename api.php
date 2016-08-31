@@ -48,7 +48,7 @@ class Fleio {
     }
 
     public function createBillingClient() {
-        $url = '/openstack/billing/create_billing_client';
+        $url = '/whmcs/billing/create_billing_client';
         $user = array("username" => $this->USER_PREFIX . $this->clientsdetails->userid,
             "email" => $this->clientsdetails->email,
             "email_verified" => true,
@@ -74,7 +74,7 @@ class Fleio {
     }    
 
     public function createUser() {
-        $url = '/users';
+        $url = '/whmcs/users';
         $postf = array("username" => $this->USER_PREFIX . $this->clientsdetails->userid,
             "email" => $this->clientsdetails->email,
             "email_verified" => true,
@@ -85,7 +85,7 @@ class Fleio {
     }
 
     public function createClient() {
-        $url = '/clients';
+        $url = '/whmcs/clients';
         $postfields = array('first_name' => $this->clientsdetails->firstname,
              'last_name' => $this->clientsdetails->lastname,
              'company' => $this->clientsdetails->company,
@@ -103,7 +103,7 @@ class Fleio {
     }
 
     public function createOpenstackProject($clientid) {
-        $url = '/openstack/projects';
+        $url = '/whmcs/projects';
         $postfields = array('client' => $clientid);
         return $this->flApi->post($url, $postfields);
     }
@@ -111,7 +111,7 @@ class Fleio {
     private function getClientId() {
         /* Get the Fleio client id from the WHMCS user id */
         # TODO(tomo): throw if the clientId is not found
-        $url = '/clients';
+        $url = '/whmcs/clients';
         $query_params = array('external_billing_id' => $this->clientsdetails->userid);
         $response = $this->flApi->get($url, $query_params);
         if ($response == null) {
@@ -125,7 +125,7 @@ class Fleio {
     }
 
     public function getUserId() {
-        $url = '/users';
+        $url = '/whmcs/users';
         $query_params = array('external_billing_id' => $this->clientsdetails->userid);
         $response = $this->flApi->get($url, $query_params);
         if ($response == null) {
@@ -139,13 +139,13 @@ class Fleio {
     }
 
     public function addUserToClient($client_id, $user_id) {
-        $url = '/clients/' . $client_id . '/add_user';
+        $url = '/whmcs/clients/' . $client_id . '/add_user';
         $postfields = array('user' => $user_id, 'client' => $client_id);
         return $this->flApi->post($url, $postfields);
     }
 
     private function getSSOSession() {
-        $url = '/get-sso-session';
+        $url = '/whmcs/get-sso-session';
         $params = array('euid' => $this->clientsdetails->userid);
         return $this->flApi->post($url, $params);
     }
@@ -162,44 +162,44 @@ class Fleio {
 
     public function getUsage() {
         $client_id = $this->getClientId();
-        $url = '/clients/' . $client_id . '/usage';
+        $url = '/whmcs/clients/' . $client_id . '/usage';
         return $this->flApi->get($url);
     }
 
     public function getClientRamainingCredit() {
         # Return the client's remainig credit and currency code
         $client_id = $this->getClientId();
-        $url = '/openstack/billing/' . $client_id . '/credit_balance';
+        $url = '/whmcs/billing/' . $client_id . '/credit_balance';
         return $this->flApi->get($url);
     }
 
     public function getToken($user_id) {
-        $url = '/users/' . $user_id . '/token';
+        $url = '/whmcs/users/' . $user_id . '/token';
         $response = $this->flApi->post($url);
         return $response['token'];
     }
 
     public function suspendOpenstack() {
         $fleio_client_id = $this->getClientId();
-        $url = '/clients/' . $fleio_client_id . '/suspend';
+        $url = '/whmcs/clients/' . $fleio_client_id . '/suspend';
         return $this->flApi->post($url);
     }
 
     public function resumeOpenstack() {
         $fleio_client_id = $this->getClientId();
-        $url = '/clients/' . $fleio_client_id . '/resume';
+        $url = '/whmcs/clients/' . $fleio_client_id . '/resume';
         return $this->flApi->post($url);
     }
 
     public function terminateOpenstack() {
         $fleio_client_id = $this->getClientId();
-        $url = '/clients/' . $fleio_client_id . '/terminate';
+        $url = '/whmcs/clients/' . $fleio_client_id . '/terminate';
         return $this->flApi->post($url);
     }
 
     public function updateCredit($amount, $currencyCode, $currencyRate, $convertedAmount) {
         $fleio_client_id = $this->getClientId();
-        $url = '/clients/' . $fleio_client_id . '/update_credit';
+        $url = '/whmcs/clients/' . $fleio_client_id . '/update_credit';
         $params = array('amount' => $amount,
                         'currency' => $currencyCode,
                         'rate' => $currencyRate,
