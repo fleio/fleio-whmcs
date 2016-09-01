@@ -166,7 +166,7 @@ class Fleio {
         return $this->flApi->get($url);
     }
 
-    public function getClientRamainingCredit() {
+    public function getClientRemainingCredit() {
         # Return the client's remainig credit and currency code
         $client_id = $this->getClientId();
         $url = '/whmcs/billing/' . $client_id . '/credit_balance';
@@ -258,16 +258,20 @@ class FlApi {
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         $result = curl_exec($ch);
         $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $decoded_result = json_decode($result, true);
+        if (json_last_error() != JSON_ERROR_NONE) {
+            $decoded_result = 'Invalid response from Fleio API with http code: '. $httpcode;
+        } 
         if ($result === false)  {
             throw new FlApiCurlException(curl_error($ch), curl_errno($ch));
         } else {
             if ($httpcode > 499) {
                 throw new FlApiRequestException('An internal Fleio API error occurred', $httpcode);
             }
-            if ($httpcode > 399) { 
-                throw new FlApiRequestException($result, $httpcode);
+            if ($httpcode > 399) {
+                throw new FlApiRequestException($decoded_result, $httpcode);
             }
         }
-        return json_decode($result, true);
+        return $decoded_result;
     }
 }

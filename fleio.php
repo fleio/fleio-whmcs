@@ -222,7 +222,18 @@ function actionOverview($params, $request) {
     $maxamount = convertCurrency($max_amount, 1, $params['clientsdetails']['currency']);
 
     $fl = Fleio::fromParams($params);
-    $client_credit = $fl->getClientRamainingCredit();
+    try {
+        $client_credit = $fl->getClientRemainingCredit();
+    } catch (Exception $e) {
+        logModuleCall(
+            'fleio',
+            __FUNCTION__,
+            $params,
+            $e->getMessage(),
+            $e->getTraceAsString()
+        );
+        $client_credit = False;
+    };
     return array('clientCredit' => $client_credit,
                  'minamount' => $minamount,
                  'maxamount' => $maxamount,
