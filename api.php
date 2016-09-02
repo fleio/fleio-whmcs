@@ -73,41 +73,6 @@ class Fleio {
         return $this->flApi->post($url, $postfields);
     }    
 
-    public function createUser() {
-        $url = '/whmcs/users';
-        $postf = array("username" => $this->USER_PREFIX . $this->clientsdetails->userid,
-            "email" => $this->clientsdetails->email,
-            "email_verified" => true,
-            "first_name" => $this->clientsdetails->firstname,
-            "last_name" => $this->clientsdetails->lastname,
-            "external_billing_id" => $this->clientsdetails->userid);
-        return $this->flApi->post($url, $postf);
-    }
-
-    public function createClient() {
-        $url = '/whmcs/clients';
-        $postfields = array('first_name' => $this->clientsdetails->firstname,
-             'last_name' => $this->clientsdetails->lastname,
-             'company' => $this->clientsdetails->company,
-             'address1' => $this->clientsdetails->address1,
-             'address2' => $this->clientsdetails->address2,
-             'city' => $this->clientsdetails->city,
-             'state' => $this->clientsdetails->state,
-             'country' => $this->clientsdetails->countrycode,
-             'zip_code' => $this->clientsdetails->postcode,
-             'phone' => $this->clientsdetails->phonenumber,
-             'fax' => $this->clientsdetails->fax,
-             'email' => $this->clientsdetails->email,
-             'external_billing_id' => $this->clientsdetails->userid);
-        return $this->flApi->post($url, $postfields);
-    }
-
-    public function createOpenstackProject($clientid) {
-        $url = '/whmcs/projects';
-        $postfields = array('client' => $clientid);
-        return $this->flApi->post($url, $postfields);
-    }
-
     private function getClientId() {
         /* Get the Fleio client id from the WHMCS user id */
         # TODO(tomo): throw if the clientId is not found
@@ -122,26 +87,6 @@ class Fleio {
             throw new FlApiRequestException("Unable to retrieve the Fleio client ID", 409);; // Multiple objects returned
         }
         return $objects[0]['id'];
-    }
-
-    public function getUserId() {
-        $url = '/whmcs/users';
-        $query_params = array('external_billing_id' => $this->clientsdetails->userid);
-        $response = $this->flApi->get($url, $query_params);
-        if ($response == null) {
-            return null;
-        }
-        $objects = $response['objects'];
-        if (count($objects) > 1) {
-            return null;
-        }
-        return $objects[0]['id'];
-    }
-
-    public function addUserToClient($client_id, $user_id) {
-        $url = '/whmcs/clients/' . $client_id . '/add_user';
-        $postfields = array('user' => $user_id, 'client' => $client_id);
-        return $this->flApi->post($url, $postfields);
     }
 
     private function getSSOSession() {
@@ -171,12 +116,6 @@ class Fleio {
         $client_id = $this->getClientId();
         $url = '/whmcs/billing/' . $client_id . '/credit_balance';
         return $this->flApi->get($url);
-    }
-
-    public function getToken($user_id) {
-        $url = '/whmcs/users/' . $user_id . '/token';
-        $response = $this->flApi->post($url);
-        return $response['token'];
     }
 
     public function suspendOpenstack() {
@@ -249,6 +188,39 @@ class FlApi {
         return $response;
     }
 
+    private function parse_drf_error($drf_error, $httpcode) {
+    // If the http status is bigger than 399, it signals an error, throw it
+        if ($httpcode > 499) {
+            throw new FlApiRequestException('An internal Fleio API error occurred', $httpcode);
+        }
+
+        function get_details($inarray) {
+            $response = '';
+            if (is_array($inarray)) {
+                foreach ($inarray as $key => $value) {
+                    if (is_array($value)) {
+                        $response .= get_details($value);               
+                    } else {
+                        $response .= ' ' . $value;
+                    }
+                }
+            } else { $response .= ' ' . $inarray; }
+            return $response;
+        }
+
+        if ($httpcode > 399) {
+            $err_msg = 'Bad request with status ' . $httpcode;
+            if (is_array($drf_error)) {
+                if (array_key_exists('detail', $drf_error)) {
+                    $err_msg = (string)$drf_error->detail;
+                } else {
+                    $err_msg = get_details($drf_error);
+                }
+            }
+            throw new FlApiRequestException($err_msg, $httpcode);
+        }
+    }
+
     private function request( $ch, $method, $url ) {
         curl_setopt($ch, CURLOPT_URL, $this->SERVER_URL . $url);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
@@ -258,19 +230,15 @@ class FlApi {
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         $result = curl_exec($ch);
         $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $decoded_result = json_decode($result, true);
+        $decoded_result = json_decode($result, true);  // We should always receive a JSON response. Decode and check for errors
         if (json_last_error() != JSON_ERROR_NONE) {
             $decoded_result = 'Invalid response from Fleio API with http code: '. $httpcode;
-        } 
-        if ($result === false)  {
+        }
+        if ($result === false)  {  // If no result, a curl error may have occured
             throw new FlApiCurlException(curl_error($ch), curl_errno($ch));
-        } else {
-            if ($httpcode > 499) {
-                throw new FlApiRequestException('An internal Fleio API error occurred', $httpcode);
-            }
-            if ($httpcode > 399) {
-                throw new FlApiRequestException($decoded_result, $httpcode);
-            }
+        } 
+        if ($httpcode > 399) {
+            return $this->parse_drf_error($decoded_result, $httpcode);
         }
         return $decoded_result;
     }
