@@ -14,6 +14,56 @@ add_hook("InvoiceRefunded", 99, "openstack_del_credit_hook");
 add_hook("AfterModuleCreate", 99, "openstack_add_initial_credit");
 add_hook("ClientAreaPrimarySidebar", 99, "fleio_ClientAreaPrimarySidebar");
 add_hook("ClientAreaPrimaryNavbar", 99, "fleio_ClientAreaPrimaryNavbar");
+add_hook("InvoiceCreation", 99, "fleio_update_invoice_hook");
+
+function fleio_update_invoice_hook($vars) {
+    if ($vars['source'] != 'autogen') {
+	# created in admin or client area
+	return;
+    }
+    $invoice = Capsule::table('tblinvoices')->where('id', '=', $vars["invoiceid"])->first();
+    $items = Capsule::table('tblinvoiceitems')->where('invoiceid', '=', $vars["invoiceid"])->get();
+
+    $tax = 0.0;
+    $tax2 = 0.0;
+    $subtotal_price = 0.0;
+    foreach($items as $item){
+	    $fl = Fleio::fromProdId($item->relid);
+	    $product = Capsule::table('tblinvoiceitems')
+			->join('tblhosting', 'tblinvoiceitems.relid', '=', 'tblhosting.id')
+			->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
+			->where('tblinvoiceitems.relid', '=', $item->relid)
+			->select('tblproducts.servertype')->first();
+	    if ($product->servertype != 'fleio') {
+			return;
+	    }
+		$exception = false;
+		try {
+	    	$price = $fl->getUsagePrice($invoice->userid);
+		}
+		catch (FlApiRequestException $e) {
+			logactivity($e->getMessage());
+			$exception = true;
+			Capsule::table('tblinvoiceitems')->where('id', '=', $item->id)->delete();
+		}
+	    Capsule::table('tblinvoiceitems')
+	            ->where('id', (string) $item->id)
+	            ->update(array("amount"=>$price));
+	    if ($item->taxed) {
+			$tax += $price * $invoice->taxrate / 100;
+			$tax2 += $price * $invoice->taxrate2 / 100;
+	    }
+	    $subtotal_price += $price;
+    }
+    $total_price = $subtotal_price + $tax + $tax2;
+	if ($total_price == 0 && $exception) {
+	    Capsule::table('tblinvoices')->where('id', '=', $vars["invoiceid"])->delete();
+		logactivity('Invoice with id '.((string) $vars["invoiceid"]).' deleted');
+	}
+	else {
+	    Capsule::table('tblinvoices')->where('id', '=', $vars["invoiceid"])->update(array("subtotal"=>$total_price, "tax"=>$tax, "tax2"=>$tax2, "total"=>$total_price));
+	}
+}
 
 function openstack_change_funds($invoiceid, $substract=False) {
     $items = Capsule::table('tblinvoiceitems')->where('invoiceid', '=', $invoiceid)->get();

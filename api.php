@@ -47,6 +47,16 @@ class Fleio {
         return new self($server, $clientsdetails);
     }
 
+    public function getUsagePrice($userid) {
+	$url = '/whmcs/get-usage-summary';
+        $response = $this->flApi->get($url.'/'.$userid);
+        if ($response == null) {
+            throw new FlApiRequestException("Unable to retrieve data", 404);
+        }
+
+        return $response['price'];
+    }
+
     public function createBillingClient() {
         $url = '/whmcs/billing/create_billing_client';
         $user = array("username" => $this->USER_PREFIX . $this->clientsdetails->userid,
