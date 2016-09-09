@@ -221,9 +221,9 @@ function actionOverview($params, $request) {
     $minamount = convertCurrency($min_amount, 1, $params['clientsdetails']['currency']);
     $maxamount = convertCurrency($max_amount, 1, $params['clientsdetails']['currency']);
 
-    $fl = Fleio::fromParams($params);
+	$fl = Fleio::fromParams($params);
     try {
-        $client_credit = $fl->getClientRemainingCredit();
+        $summary = $fl->getClientSummary();
     } catch (Exception $e) {
         logModuleCall(
             'fleio',
@@ -232,11 +232,11 @@ function actionOverview($params, $request) {
             $e->getMessage(),
             $e->getTraceAsString()
         );
-        $client_credit = False;
+        $summary = False;
     };
-    return array('clientCredit' => $client_credit,
-                 'minamount' => $minamount,
+    return array('minamount' => $minamount,
                  'maxamount' => $maxamount,
+				 'summary' => $summary,
                  'currency' => getCurrency($params['clientsdetails']['userid']));
 }
 

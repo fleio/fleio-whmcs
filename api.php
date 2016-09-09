@@ -121,10 +121,10 @@ class Fleio {
         return $this->flApi->get($url);
     }
 
-    public function getClientRemainingCredit() {
+    public function getClientSummary() {
         # Return the client's remainig credit and currency code
         $client_id = $this->getClientId();
-        $url = '/whmcs/billing/' . $client_id . '/credit_balance';
+        $url = '/whmcs/get-client-summary/' . $client_id;
         return $this->flApi->get($url);
     }
 

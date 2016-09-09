@@ -1,10 +1,16 @@
+<style>
+	.panel-height-150 {
+		height:150px;
+	}
+</style>
+
 <div class="row">
     <div class="col-md-6">
-        <div class="panel panel-default" id="cPanelPackagePanel">
+        <div class="panel panel-default panel-height-150" id="cPanelPackagePanel">
             <div class="panel-heading">
-                <h3 class="panel-title">Available credit: {if $clientCredit} {$clientCredit.credit} {$clientCredit.currency} {/if}</h3>
+                <h3 class="panel-title">Available credit: {if $summary} {$summary.credit} {$summary.currency} {/if}</h3>
             </div>
-            <div class="panel-body text-center">
+            <div class="panel-body">
                 <div class="col-lg-8 col-lg-offset-2">
                     <form role="form" method="post" action="clientarea.php?action=productdetails&id={$serviceid}">
                         <input type="hidden" name="customAction" value="createflinvoice" />
@@ -23,6 +29,29 @@
            {/if}
        </div>
     </div>
+
+	<div class="col-md-6">
+        <div class="panel panel-default panel-height-150" id="cPanelPackagePanel1">
+            <div class="panel-heading">
+                <h3 class="panel-title">Summary:</h3>
+            </div>
+            <div class="panel-body">
+                <div class="col-lg-4 col-lg-offset-4" >
+					<ul class="text-left">
+						<li>
+							Instances: {$summary.instances}
+						</li>
+						<li>
+							Images: {$summary.images}
+						</li>
+						<li>
+							Volumes: {$summary.volumes}
+						</li>
+					</ul>
+                </div>
+            </div>
+       </div>
+	</div>
 </div>
 
 {if $configurableoptions}
