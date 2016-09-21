@@ -48,7 +48,7 @@ class Fleio {
     }
 
     public function getUsagePrice($userid) {
-	$url = '/whmcs/get-usage-summary';
+    	$url = '/whmcs/get-usage-summary';
         $response = $this->flApi->get($url.'/'.$userid);
         if ($response == null) {
             throw new FlApiRequestException("Unable to retrieve data", 404);
@@ -59,6 +59,7 @@ class Fleio {
 
     public function createBillingClient() {
         $url = '/whmcs/billing/create_billing_client';
+        $currency = getCurrency();
         $user = array("username" => $this->USER_PREFIX . $this->clientsdetails->userid,
             "email" => $this->clientsdetails->email,
             "email_verified" => true,
@@ -78,7 +79,7 @@ class Fleio {
              'fax' => $this->clientsdetails->fax,
              'email' => $this->clientsdetails->email,
              'external_billing_id' => $this->clientsdetails->userid,
-             'currency' => getCurrency()['code']);
+             'currency' => $currency['code']);
         $postfields = array("user" => $user, "client" => $client);
         return $this->flApi->post($url, $postfields);
     }    
@@ -124,7 +125,7 @@ class Fleio {
     public function getClientSummary() {
         # Return the client's remainig credit and currency code
         $client_id = $this->getClientId();
-        $url = '/whmcs/get-client-summary/' . $client_id;
+        $url = '/whmcs/clients/' . $client_id;
         return $this->flApi->get($url);
     }
 
@@ -177,7 +178,7 @@ class FlApi {
         $ch = curl_init();
         if (is_array($params)) {
             $json_params = json_encode($params);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($params));
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $json_params);
             $this->TEMP_HEADERS[] = 'Content-Length: ' . mb_strlen($json_params);
         }
         $response = $this->request($ch, 'POST', $url);
@@ -198,24 +199,24 @@ class FlApi {
         return $response;
     }
 
+    private function drf_get_details($inarray) {
+        $response = '';
+        if (is_array($inarray)) {
+            foreach ($inarray as $key => $value) {
+                if (is_array($value)) {
+                    $response .= drf_get_details($value);
+                } else {
+                    $response .= ' ' . $value;
+                }
+            }
+        } else { $response .= ' ' . $inarray; }
+        return $response;
+    }
+
     private function parse_drf_error($drf_error, $httpcode) {
     // If the http status is bigger than 399, it signals an error, throw it
         if ($httpcode > 499) {
             throw new FlApiRequestException('An internal Fleio API error occurred', $httpcode);
-        }
-
-        function get_details($inarray) {
-            $response = '';
-            if (is_array($inarray)) {
-                foreach ($inarray as $key => $value) {
-                    if (is_array($value)) {
-                        $response .= get_details($value);               
-                    } else {
-                        $response .= ' ' . $value;
-                    }
-                }
-            } else { $response .= ' ' . $inarray; }
-            return $response;
         }
 
         if ($httpcode > 399) {
@@ -224,7 +225,7 @@ class FlApi {
                 if (array_key_exists('detail', $drf_error)) {
                     $err_msg = (string)$drf_error->detail;
                 } else {
-                    $err_msg = get_details($drf_error);
+                    $err_msg = drf_get_details($drf_error);
                 }
             }
             throw new FlApiRequestException($err_msg, $httpcode);
@@ -235,8 +236,18 @@ class FlApi {
         curl_setopt($ch, CURLOPT_URL, $this->SERVER_URL . $url);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
+        curl_setopt($ch, CURLOPT_AUTOREFERER, true);
+        curl_setopt($ch, CURLOPT_POSTREDIR, 3);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // Set the connection timeout to 10 seconds.
-        $headers = $this->HEADERS + $this->TEMP_HEADERS;
+        $headers = array();
+        foreach ($this->HEADERS as $h) {
+            array_push($headers, $h);
+        }
+        foreach ($this->TEMP_HEADERS as $th) {
+            array_push($headers, $th);
+        }
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         $result = curl_exec($ch);
         $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
