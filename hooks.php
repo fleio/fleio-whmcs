@@ -28,7 +28,6 @@ function fleio_update_invoice_hook($vars) {
     $tax2 = 0.0;
     $subtotal_price = 0.0;
     foreach($items as $item){
-	    $fl = Fleio::fromProdId($item->relid);
 	    $product = Capsule::table('tblinvoiceitems')
 			->join('tblhosting', 'tblinvoiceitems.relid', '=', 'tblhosting.id')
 			->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
@@ -37,6 +36,12 @@ function fleio_update_invoice_hook($vars) {
 	    if ($product->servertype != 'fleio') {
 			return;
 	    }
+        try {
+            $fl = Fleio::fromProdId($item->relid);
+        } catch (Exception $e) {
+            logActivity('Unable to initialize the fleio module: ' . $e->getMessage());
+            return;
+        }
 		$exception = false;
 		try {
 	    	$price = $fl->getUsagePrice($invoice->userid);
