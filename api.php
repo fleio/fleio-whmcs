@@ -204,7 +204,7 @@ class FlApi {
         if (is_array($inarray)) {
             foreach ($inarray as $key => $value) {
                 if (is_array($value)) {
-                    $response .= drf_get_details($value);
+                    $response .= $this->drf_get_details($value);
                 } else {
                     $response .= ' ' . $value;
                 }
@@ -225,7 +225,7 @@ class FlApi {
                 if (array_key_exists('detail', $drf_error)) {
                     $err_msg = (string)$drf_error->detail;
                 } else {
-                    $err_msg = drf_get_details($drf_error);
+                    $err_msg = $this->drf_get_details($drf_error);
                 }
             }
             throw new FlApiRequestException($err_msg, $httpcode);
