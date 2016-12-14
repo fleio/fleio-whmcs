@@ -23,7 +23,6 @@ function fleio_update_invoice_hook($vars) {
     }
     $invoice = Capsule::table('tblinvoices')->where('id', '=', $vars["invoiceid"])->first();
     $items = Capsule::table('tblinvoiceitems')->where('invoiceid', '=', $vars["invoiceid"])->get();
-
     $tax = 0.0;
     $tax2 = 0.0;
     $subtotal_price = 0.0;
@@ -44,10 +43,10 @@ function fleio_update_invoice_hook($vars) {
         }
 		$exception = false;
 		try {
-	    	$price = $fl->getUsagePrice($invoice->userid);
+	    	    $price = $fl->getBillingSummary();
 		}
 		catch (FlApiRequestException $e) {
-			logactivity($e->getMessage());
+			logActivity($e->getMessage());
 			$exception = true;
 			Capsule::table('tblinvoiceitems')->where('id', '=', $item->id)->delete();
 		}

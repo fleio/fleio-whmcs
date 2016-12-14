@@ -26,7 +26,7 @@ class Fleio {
         $server = new stdClass;
         $server->url = $params['configoption4'];
         $server->frontend_url = $params['configoption2'];
-        $server->token = $params[ 'configoption1' ];
+        $server->token = $params['configoption1'];
         $clientsdetails = (object) $params['clientsdetails'];
         return new self($server, $clientsdetails);
     }
@@ -34,7 +34,7 @@ class Fleio {
     public static function fromProdId($prodid) {
         $prodid = (string) $prodid;
         if (!is_string($prodid) or empty($prodid)) { // empty treats "0" as empty. We assume a product id will never be 0.
-            throw new FlApiException('Unable to initialize the fleio client.');
+            throw new FlApiException('Unable to initialize the Fleio api client.');
         }
         $clientsdetails = Capsule::table('tblclients')->join('tblhosting', 'tblhosting.userid', '=', 'tblclients.id')->where('tblhosting.id', '=', $prodid)->first();
         $dbserver = Capsule::table('tblhosting')
@@ -47,9 +47,10 @@ class Fleio {
         return new self($server, $clientsdetails);
     }
 
-    public function getUsagePrice($userid) {
-    	$url = '/whmcs/get-usage-summary';
-        $response = $this->flApi->get($url.'/'.$userid);
+    public function getBillingSummary() {
+        $fleio_client_id = $this->getClientId();
+    	$url = '/whmcs/clients/'. $fleio_client_id . '/billing_summary';
+        $response = $this->flApi->get($url);
         if ($response == null) {
             throw new FlApiRequestException("Unable to retrieve data", 404);
         }
@@ -57,15 +58,15 @@ class Fleio {
         return $response['price'];
     }
 
-    public function createBillingClient() {
-        $url = '/whmcs/billing/create_billing_client';
+    public function createBillingClient($groups) {
+        $url = '/whmcs/clients';
         $currency = getCurrency();
         $user = array("username" => $this->USER_PREFIX . $this->clientsdetails->userid,
             "email" => $this->clientsdetails->email,
             "email_verified" => true,
             "first_name" => $this->clientsdetails->firstname,
             "last_name" => $this->clientsdetails->lastname,
-            "external_billing_id" => $this->clientsdetails->userid);
+            "external_billing_id" => $this->clientsdetails->uuid);
         $client = array('first_name' => $this->clientsdetails->firstname,
              'last_name' => $this->clientsdetails->lastname,
              'company' => $this->clientsdetails->company,
@@ -78,8 +79,13 @@ class Fleio {
              'phone' => $this->clientsdetails->phonenumber,
              'fax' => $this->clientsdetails->fax,
              'email' => $this->clientsdetails->email,
-             'external_billing_id' => $this->clientsdetails->userid,
+             'external_billing_id' => $this->clientsdetails->uuid,
              'currency' => $currency['code']);
+
+        if (isset($groups) && trim($groups) != '') {
+            $client_groups = array_map('trim', explode(',', $groups, 10));
+            $client['groups'] = $client_groups;
+        };
         $postfields = array("user" => $user, "client" => $client);
         return $this->flApi->post($url, $postfields);
     }    
@@ -88,7 +94,7 @@ class Fleio {
         /* Get the Fleio client id from the WHMCS user id */
         # TODO(tomo): throw if the clientId is not found
         $url = '/whmcs/clients';
-        $query_params = array('external_billing_id' => $this->clientsdetails->userid);
+        $query_params = array('external_billing_id' => $this->clientsdetails->uuid);
         $response = $this->flApi->get($url, $query_params);
         if ($response == null) {
             throw new FlApiRequestException("Unable to retrieve the Fleio client ID", 404);
@@ -102,12 +108,12 @@ class Fleio {
 
     private function getSSOSession() {
         $url = '/whmcs/get-sso-session';
-        $params = array('euid' => $this->clientsdetails->userid);
+        $params = array('euid' => $this->clientsdetails->uuid);
         return $this->flApi->post($url, $params);
     }
 
     public function getSSOUrl() {
-        $euid = $this->clientsdetails->userid;
+        $euid = $this->clientsdetails->uuid;
         $url = $this->SERVER->frontend_url . '/sso?';
         $rsp = $this->getSSOSession();
         $params = array( 'euid', 'timestamp', 'hash_val' );
@@ -116,16 +122,9 @@ class Fleio {
         return  $url . $send_params;
     }
 
-    public function getUsage() {
-        $client_id = $this->getClientId();
-        $url = '/whmcs/clients/' . $client_id . '/usage';
-        return $this->flApi->get($url);
-    }
-
     public function getClientSummary() {
-        # Return the client's remainig credit and currency code
         $client_id = $this->getClientId();
-        $url = '/whmcs/clients/' . $client_id;
+        $url = '/whmcs/clients/' . $client_id . '/usage_summary';
         return $this->flApi->get($url);
     }
 
@@ -204,7 +203,7 @@ class FlApi {
         if (is_array($inarray)) {
             foreach ($inarray as $key => $value) {
                 if (is_array($value)) {
-                    $response .= $this->drf_get_details($value);
+                    $response .= $key . ': ' . $this->drf_get_details($value);
                 } else {
                     $response .= ' ' . $value;
                 }

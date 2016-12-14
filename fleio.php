@@ -22,9 +22,10 @@ function fleio_MetaData()
 
 function fleio_ConfigOptions() {
     global $_LANG;
+    $default_currency_code = getCurrency()['code'];
     $configarray = array(
     "admintoken" => array (
-        "FriendlyName" => "Fleio Token",
+        "FriendlyName" => "Fleio staff Token",
         "Type" => "password", # Password Field
         "Size" => "64", # Defines the Field Width
         "Default" => "",
@@ -37,7 +38,7 @@ function fleio_ConfigOptions() {
         "Default" => "https://",
     ),
     "frontendadminurl" => array (
-        "FriendlyName" => "Frontend admin URL",
+        "FriendlyName" => "Frontend staff URL",
         "Type" => "text", # Text Box
         "Size" => "64", # Defines the Field Width
         "Description" => "",
@@ -51,18 +52,25 @@ function fleio_ConfigOptions() {
         "Default" => "https://",
     ),
     "minamount" => array (
-        "FriendlyName" => "Minimum amount",
+        "FriendlyName" => "Minimum payment amount",
         "Type" => "text", # Text Box
         "Size" => "10", # Defines the Field Width
-        "Description" => "",
+        "Description" => "". $default_currency_code,
         "Default" => "10",
     ),
     "maxamount" => array (
-        "FriendlyName" => "Maximum amount",
+        "FriendlyName" => "Maximum payment amount",
         "Type" => "text", # Text Box
         "Size" => "10", # Defines the Field Width
-        "Description" => "",
+        "Description" => "". $default_currency_code,
         "Default" => "1000",
+    ),
+    "clientgroup" => array (
+        "FriendlyName" => "Place clients inside a Fleio client group",
+        "Type" => "text", # Text Box
+        "Size" => "64", # Defines the Field Width
+        "Description" => "",
+        "Default" => "",
     ),
     );
     return $configarray;
@@ -71,7 +79,7 @@ function fleio_ConfigOptions() {
 function fleio_CreateAccount($params){
     $fl = Fleio::fromParams($params);
     try {
-        $fl->createBillingClient();
+        $fl->createBillingClient($params['configoption7']);
     } catch (FlApiException $e) {
         return $e->getMessage();
     }
@@ -236,7 +244,7 @@ function actionOverview($params, $request) {
     };
     return array('minamount' => $minamount,
                  'maxamount' => $maxamount,
-				 'summary' => $summary,
+		 'summary' => $summary,
                  'currency' => getCurrency($params['clientsdetails']['userid']));
 }
 
