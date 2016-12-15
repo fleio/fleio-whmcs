@@ -67,7 +67,8 @@ class Fleio {
             "first_name" => $this->clientsdetails->firstname,
             "last_name" => $this->clientsdetails->lastname,
             "external_billing_id" => $this->clientsdetails->uuid);
-        $client = array('first_name' => $this->clientsdetails->firstname,
+        $client = array('user' => $user,
+             'first_name' => $this->clientsdetails->firstname,
              'last_name' => $this->clientsdetails->lastname,
              'company' => $this->clientsdetails->company,
              'address1' => $this->clientsdetails->address1,
@@ -86,8 +87,7 @@ class Fleio {
             $client_groups = array_map('trim', explode(',', $groups, 10));
             $client['groups'] = $client_groups;
         };
-        $postfields = array("user" => $user, "client" => $client);
-        return $this->flApi->post($url, $postfields);
+        return $this->flApi->post($url, $client);
     }    
 
     private function getClientId() {
