@@ -8,7 +8,7 @@
     <div class="col-md-6">
         <div class="panel panel-default panel-height-150" id="cPanelPackagePanel">
             <div class="panel-heading">
-                <h3 class="panel-title">Available credit: {if $summary} {$summary.credit} {$summary.currency} {/if}</h3>
+                <h3 class="panel-title">Available cloud credit: {if $summary} {$summary.credit} {$summary.currency} {/if}</h3>
             </div>
             <div class="panel-body">
                 <div class="col-lg-8 col-lg-offset-2">
@@ -36,7 +36,7 @@
                 <h3 class="panel-title">Summary:</h3>
             </div>
             <div class="panel-body">
-                <div class="col-lg-4 col-lg-offset-4" >
+                <div class="col-lg-4 col-lg-offset-4" style="margin: 0; padding: 0;">
 					<ul class="text-left">
 						<li>Instances: {$summary.instances}</li>
 						<li>Images: {$summary.images}</li>

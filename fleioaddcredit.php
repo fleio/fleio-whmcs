@@ -1,10 +1,6 @@
 <?php
 # Move this file to the main installation directory 
 
-if (!defined("WHMCS")) {
-    die("This file cannot be accessed directly");
-}
-
 use WHMCS\ClientArea;
 use WHMCS\Database\Capsule;
  
@@ -27,6 +23,7 @@ if ($ca->isLoggedIn()) {
                     ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
                     ->where('tblhosting.userid', '=', $ca->getUserID())
                     ->where('tblhosting.domainstatus', '=', 'Active')
+                    ->where('tblproducts.servertype', '=', 'fleio')
                     ->select('tblhosting.id')
                     ->first();
     } catch (Exception $e) {

@@ -4,7 +4,6 @@ if (!defined("WHMCS")) {
     die("This file cannot be accessed directly");
 }
 
-// see Laravel queries. WHMCS 6+ uses Capsule
 use Illuminate\Database\Capsule\Manager as Capsule;
 
 class FlApiException extends Exception {}
@@ -47,14 +46,13 @@ class Fleio {
         return new self($server, $clientsdetails);
     }
 
-    public function getBillingSummary() {
+    public function getBillingPrice() {
         $fleio_client_id = $this->getClientId();
     	$url = '/whmcs/clients/'. $fleio_client_id . '/billing_summary';
         $response = $this->flApi->get($url);
         if ($response == null) {
-            throw new FlApiRequestException("Unable to retrieve data", 404);
+            throw new FlApiRequestException("Unable to retrieve billing summary", 404);
         }
-
         return $response['price'];
     }
 

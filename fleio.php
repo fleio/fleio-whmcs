@@ -228,8 +228,7 @@ function actionOverview($params, $request) {
     // Min/Max in client's currency
     $minamount = convertCurrency($min_amount, 1, $params['clientsdetails']['currency']);
     $maxamount = convertCurrency($max_amount, 1, $params['clientsdetails']['currency']);
-
-	$fl = Fleio::fromParams($params);
+    $fl = Fleio::fromParams($params);
     try {
         $summary = $fl->getClientSummary();
     } catch (Exception $e) {
