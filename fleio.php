@@ -241,9 +241,14 @@ function actionOverview($params, $request) {
         );
         $summary = False;
     };
+    // Convert from Fleio client currency to the WHMCS client currency
+    if ($summary['last_usage_price'] && $summary['currency']) {
+        $last_usage_price = convertCurrency($summary['last_usage_price'], 1, $params['clientsdetails']['currency']);
+    } else { $last_usage_price = 0; };
     return array('minamount' => $minamount,
                  'maxamount' => $maxamount,
-		 'summary' => $summary,
+                 'summary' => $summary,
+                 'last_usage_price' => $last_usage_price,
                  'currency' => getCurrency($params['clientsdetails']['userid']));
 }
 
