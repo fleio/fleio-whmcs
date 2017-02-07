@@ -8,7 +8,7 @@ use WHMCS\Database\Capsule;
 define('CLIENTAREA', true);
 //define('FORCESSL', true); // Uncomment to force the page to use https://
  
-require __DIR__ . '/init.php';
+require getcwd() . '/init.php';
 
 $ca = new ClientArea();
 $ca->setPageTitle('Fleio add credit');
