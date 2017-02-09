@@ -46,6 +46,12 @@ class Fleio {
         return new self($server, $clientsdetails);
     }
 
+    private function generatePassword($size) {
+        // We don't use the product password since it's stored in clear text in WHMCS
+        $data = '1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcefghijklmnopqrstuvwxyz&%#$@';
+        return substr(str_shuffle($data), 0, $size);
+    }
+
     public function getBillingPrice() {
         $fleio_client_id = $this->getClientId();
     	$url = '/whmcs/clients/'. $fleio_client_id . '/billing_summary';
@@ -64,6 +70,7 @@ class Fleio {
             "email_verified" => true,
             "first_name" => $this->clientsdetails->firstname,
             "last_name" => $this->clientsdetails->lastname,
+            "password" => $this->generatePassword(16),
             "external_billing_id" => $this->clientsdetails->uuid);
         $client = array('user' => $user,
              'first_name' => $this->clientsdetails->firstname,
