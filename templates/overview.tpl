@@ -43,9 +43,9 @@
             <div class="panel-body">
                 <div class="col-lg-4 col-lg-offset-4" style="margin: 0; padding: 2;">
                     <ul class="text-left">
-                        <li>Instances: {$summary.instances}</li>
-                        <li>Images: {$summary.images}</li>
-                        <li>Volumes: {$summary.volumes}</li>
+                        <li>Instances:&nbsp;{$summary.instances}</li>
+                        <li>Images:&nbsp;{$summary.images}</li>
+                        <li>Volumes:&nbsp;{$summary.volumes}</li>
                     </ul>
                 </div>
             </div>
