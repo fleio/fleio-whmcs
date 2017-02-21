@@ -54,7 +54,7 @@ class Fleio {
 
     public function getBillingPrice() {
         $fleio_client_id = $this->getClientId();
-    	$url = '/whmcs/clients/'. $fleio_client_id . '/billing_summary';
+    	$url = '/clients/'. $fleio_client_id . '/billing_summary';
         $response = $this->flApi->get($url);
         if ($response == null) {
             throw new FlApiRequestException("Unable to retrieve billing summary", 404);
@@ -63,42 +63,45 @@ class Fleio {
     }
 
     public function createBillingClient($groups) {
-        $url = '/whmcs/clients';
+        $url = '/clients';
         $currency = getCurrency();
+
         $user = array("username" => $this->USER_PREFIX . $this->clientsdetails->userid,
-            "email" => $this->clientsdetails->email,
-            "email_verified" => true,
-            "first_name" => $this->clientsdetails->firstname,
-            "last_name" => $this->clientsdetails->lastname,
-            "password" => $this->generatePassword(16),
-            "external_billing_id" => $this->clientsdetails->uuid);
-        $client = array('user' => $user,
-             'first_name' => $this->clientsdetails->firstname,
-             'last_name' => $this->clientsdetails->lastname,
-             'company' => $this->clientsdetails->company,
-             'address1' => $this->clientsdetails->address1,
-             'address2' => $this->clientsdetails->address2,
-             'city' => $this->clientsdetails->city,
-             'state' => $this->clientsdetails->state,
-             'country' => $this->clientsdetails->countrycode,
-             'zip_code' => $this->clientsdetails->postcode,
-             'phone' => $this->clientsdetails->phonenumber,
-             'fax' => $this->clientsdetails->fax,
-             'email' => $this->clientsdetails->email,
-             'external_billing_id' => $this->clientsdetails->uuid,
-             'currency' => $currency['code']);
+                      "email" => $this->clientsdetails->email,
+                      "email_verified" => true,
+                      "first_name" => $this->clientsdetails->firstname,
+                      "last_name" => $this->clientsdetails->lastname,
+                      "password" => $this->generatePassword(16),
+                      "external_billing_id" => $this->clientsdetails->uuid);
+
+        $client = array('first_name' => $this->clientsdetails->firstname,
+                        'last_name' => $this->clientsdetails->lastname,
+                        'company' => $this->clientsdetails->company,
+                        'address1' => $this->clientsdetails->address1,
+                        'address2' => $this->clientsdetails->address2,
+                        'city' => $this->clientsdetails->city,
+                        'state' => $this->clientsdetails->state,
+                        'country' => $this->clientsdetails->countrycode,
+                        'zip_code' => $this->clientsdetails->postcode,
+                        'phone' => $this->clientsdetails->phonenumber,
+                        'fax' => $this->clientsdetails->fax,
+                        'email' => $this->clientsdetails->email,
+                        'external_billing_id' => $this->clientsdetails->uuid,
+                        'currency' => $currency['code'],
+                        'user' => $user,
+                        'create_openstack_project' => true);
 
         if (isset($groups) && trim($groups) != '') {
             $client_groups = array_map('trim', explode(',', $groups, 10));
             $client['groups'] = $client_groups;
         };
         return $this->flApi->post($url, $client);
-    }    
+    }
 
     private function getClientId() {
         /* Get the Fleio client id from the WHMCS user id */
         # TODO(tomo): throw if the clientId is not found
-        $url = '/whmcs/clients';
+        $url = '/clients';
         $query_params = array('external_billing_id' => $this->clientsdetails->uuid);
         $response = $this->flApi->get($url, $query_params);
         if ($response == null) {
@@ -108,11 +111,14 @@ class Fleio {
         if (count($objects) > 1) {
             throw new FlApiRequestException("Unable to retrieve the Fleio client ID", 409);; // Multiple objects returned
         }
+        if (count($objects) == 0) {
+           throw new FlApiRequestException("Unable to retrieve the Fleio client ID", 404);
+	}
         return $objects[0]['id'];
     }
 
     private function getSSOSession() {
-        $url = '/whmcs/get-sso-session';
+        $url = '/get-sso-session';
         $params = array('euid' => $this->clientsdetails->uuid);
         return $this->flApi->post($url, $params);
     }
@@ -129,31 +135,31 @@ class Fleio {
 
     public function getClientSummary() {
         $client_id = $this->getClientId();
-        $url = '/whmcs/clients/' . $client_id . '/usage_summary';
+        $url = '/clients/' . $client_id . '/usage_summary';
         return $this->flApi->get($url);
     }
 
     public function suspendOpenstack() {
         $fleio_client_id = $this->getClientId();
-        $url = '/whmcs/clients/' . $fleio_client_id . '/suspend';
+        $url = '/clients/' . $fleio_client_id . '/suspend';
         return $this->flApi->post($url);
     }
 
     public function resumeOpenstack() {
         $fleio_client_id = $this->getClientId();
-        $url = '/whmcs/clients/' . $fleio_client_id . '/resume';
+        $url = '/clients/' . $fleio_client_id . '/resume';
         return $this->flApi->post($url);
     }
 
     public function terminateOpenstack() {
         $fleio_client_id = $this->getClientId();
-        $url = '/whmcs/clients/' . $fleio_client_id . '/terminate';
+        $url = '/clients/' . $fleio_client_id . '/terminate';
         return $this->flApi->post($url);
     }
 
     public function updateCredit($amount, $currencyCode, $currencyRate, $convertedAmount) {
         $fleio_client_id = $this->getClientId();
-        $url = '/whmcs/clients/' . $fleio_client_id . '/update_credit';
+        $url = '/clients/' . $fleio_client_id . '/update_credit';
         $params = array('amount' => $amount,
                         'currency' => $currencyCode,
                         'rate' => $currencyRate,
@@ -199,6 +205,13 @@ class FlApi {
             $url .= '?'.$getfields;
         }
         $response = $this->request($ch, 'GET', $url);
+        curl_close($ch);
+        return $response;
+    }
+
+    public function delete( $url ) {
+        $ch = curl_init();
+        $response = $this->request($ch, 'DELETE', $url);
         curl_close($ch);
         return $response;
     }
