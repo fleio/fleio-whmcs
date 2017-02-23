@@ -72,6 +72,17 @@ function fleio_ConfigOptions() {
         "Description" => "",
         "Default" => "",
     ),
+    "billingtype" => array (
+        "FriendlyName" => "Billing type",
+        "Type" => "dropdown",
+        "Options" => [
+            'disabled' => 'Disabled',
+            'prepaid' => 'Pre-Paid',
+            'postpaid' => 'Post-Paid'
+        ],
+        "Description" => "How WHMCS handles billing",
+        "Default" => "Disabled"
+    ),
     );
     return $configarray;
 }
@@ -306,7 +317,7 @@ function actionCreateInvoice($params, $request) {
         Capsule::table('tblinvoiceitems')
             ->where('invoiceid', $results['invoiceid'])
             ->where('userid', $clientsdetails['userid'])
-            ->update(array("type"=>"fleio", "relid"=>$params['serviceid']));
+            ->update(array("type"=>"Hosting", "relid"=>$params['serviceid']));
         redir("id=".(int)$results["invoiceid"],"viewinvoice.php");
     } else {
         throw new Exception($results["message"]);

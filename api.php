@@ -31,6 +31,7 @@ class Fleio {
     }
 
     public static function fromProdId($prodid) {
+        # NOTE(tomo): prodid is actually a tblhosting object ID, not the tblproducts ID
         $prodid = (string) $prodid;
         if (!is_string($prodid) or empty($prodid)) { // empty treats "0" as empty. We assume a product id will never be 0.
             throw new FlApiException('Unable to initialize the Fleio api client.');
@@ -38,6 +39,7 @@ class Fleio {
         $clientsdetails = Capsule::table('tblclients')->join('tblhosting', 'tblhosting.userid', '=', 'tblclients.id')->where('tblhosting.id', '=', $prodid)->first();
         $dbserver = Capsule::table('tblhosting')
             ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
+            ->select('tblproducts.configoption1', 'tblproducts.configoption2', 'tblproducts->configoption4')
             ->where('tblhosting.id', '=', $prodid)->first();
         $server = new stdClass;
         $server->url = $dbserver->configoption4;
@@ -109,7 +111,7 @@ class Fleio {
         }
         $objects = $response['objects'];
         if (count($objects) > 1) {
-            throw new FlApiRequestException("Unable to retrieve the Fleio client ID", 409);; // Multiple objects returned
+            throw new FlApiRequestException("Unable to retrieve the Fleio client ID", 409); // Multiple objects returned
         }
         if (count($objects) == 0) {
            throw new FlApiRequestException("Unable to retrieve the Fleio client ID", 404);
@@ -166,6 +168,7 @@ class Fleio {
                         'converted_amount' => $convertedAmount);
         return $this->flApi->post($url, $params); 
     }
+
 }
 
 

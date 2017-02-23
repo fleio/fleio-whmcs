@@ -4,7 +4,8 @@ if (!defined("WHMCS")) {
     die("This file cannot be accessed directly");
 }
 
-require_once __DIR__ . '/api.php';
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'api.php';
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'utils.php';
 use Illuminate\Database\Capsule\Manager as Capsule;
 use WHMCS\View\Menu\Item as MenuItem;
 
@@ -15,6 +16,53 @@ add_hook("AfterModuleCreate", 99, "openstack_add_initial_credit");
 add_hook("ClientAreaPrimarySidebar", 99, "fleio_ClientAreaPrimarySidebar");
 add_hook("ClientAreaPrimaryNavbar", 99, "fleio_ClientAreaPrimaryNavbar");
 add_hook("InvoiceCreation", 99, "fleio_update_invoice_hook");
+add_hook("DailyCronJob", 99, "fleio_cronjob");
+add_hook("AdminClientServicesTabFieldsSave", 99, "fleio_cronjob");
+
+
+function fleio_cronjob($vars) {
+    logActivity('Fleio: daily cron start');
+    $fleioServers = FleioUtils::getFleioProducts();
+    foreach($fleioServers as $server) {
+        $flApi = new FlApi($server->configoption4, $server->configoption1);
+        try {
+            $bhistories = FleioUtils::getBillingHistory($flApi, date('Y-m-d'));
+        } catch ( Exception $e ) {
+            logActivity('Fleio: unable to retrieve billing history. ' . $e->getMessage());
+            return;
+        }
+        logActivity('Fleio: got ' . count($bhistories) . ' client logs from Fleio Product ID: ' . $server->id);
+        foreach($bhistories as $bhist) {
+		  $client_uuid = $bhist['client']['external_billing_id'];
+          if (!$client_uuid) { continue; }
+		  $price = $bhist['price']; # FIXME(tomo): Convert to client's currency (make sure it's the same)
+		  try {
+			  $client = Capsule::table('tblclients')->where('uuid', '=', $client_uuid)->first();
+		  } catch (Exception $e) {
+			logActivity('Fleio: unable to retrieve client with uuid ' . $client_uuid);
+			continue;
+		  }
+          if (!$client) { 
+            logActivity('Fleio: no user with uuid: ' . $client_uuid);
+          	continue; 
+          }
+		  $product = FleioUtils::getClientProduct($client->id);
+          if (!$product) { 
+            logActivity('Fleio: no active products for User ID: ' . $client->id, $client->id); 
+			continue; 
+		  }
+		  # Create the invoice
+		  $postData = [
+			  'userid' => $client->id,
+			  'sendinvoice' => '1',
+			  'itemdescription1' => $product->name,
+			  'itemamount1' => $price,
+			  'itemtaxed1' => $product->tax,
+			  'autoapplycredit' => '0'];
+		  $invoice_id = FleioUtils::createFleioInvoice($product->id, $postData);
+        }
+    }
+}
 
 function fleio_update_invoice_hook($vars) {
     if ($vars['source'] != 'autogen') {
@@ -72,8 +120,9 @@ function fleio_update_invoice_hook($vars) {
 
 function openstack_change_funds($invoiceid, $substract=False) {
     $items = Capsule::table('tblinvoiceitems')->where('invoiceid', '=', $invoiceid)->get();
+    $fleioProductIds = FleioUtils::getFleioProductsIds();
     foreach($items as $item) {
-        if ($item->type == 'fleio') {
+        if (in_array($item->relid, $fleioProductIds)) {
             $currency = getCurrency($item->userid);
             $defaultCurrency = getCurrency();
             $convertedAmount = $item->amount; // Amount in client's currency
@@ -138,7 +187,7 @@ function openstack_add_initial_credit($vars) {
     Capsule::table('tblinvoiceitems')
             ->where('invoiceid', (string) $invoice->id)
             ->where('relid', (string) $params['serviceid'])
-            ->update(array("type"=>"fleio")); 
+            ->update(array("type"=>"Hosting")); 
     if ($invoice->status == 'Paid') {
         logActivity("Adding initial Fleio credit from Invoice ID: " . (string) $invoice->id);
         openstack_change_funds($invoice->id);
