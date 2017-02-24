@@ -12,7 +12,7 @@ use WHMCS\View\Menu\Item as MenuItem;
 add_hook("InvoicePaid", 99, "openstack_add_funds_hook", "");
 add_hook("InvoiceUnpaid", 99, "openstack_del_credit_hook");
 add_hook("InvoiceRefunded", 99, "openstack_del_credit_hook");
-add_hook("AfterModuleCreate", 99, "openstack_add_initial_credit");
+# add_hook("AfterModuleCreate", 99, "fleio_add_initial_credit");
 add_hook("ClientAreaPrimarySidebar", 99, "fleio_ClientAreaPrimarySidebar");
 add_hook("ClientAreaPrimaryNavbar", 99, "fleio_ClientAreaPrimaryNavbar");
 add_hook("InvoiceCreation", 99, "fleio_update_invoice_hook");
@@ -57,14 +57,15 @@ function fleio_cronjob($vars) {
 			  'sendinvoice' => '1',
 			  'itemdescription1' => $product->name,
 			  'itemamount1' => $price,
-			  'itemtaxed1' => $product->tax,
-			  'autoapplycredit' => '0'];
+			  'itemtaxed1' => true];
 		  $invoice_id = FleioUtils::createFleioInvoice($product->id, $postData);
         }
     }
 }
 
 function fleio_update_invoice_hook($vars) {
+    logActivity('Invoice Creation');
+    logActivity(print_r($vars, true));
     if ($vars['source'] != 'autogen') {
 	# created manually in admin or client area, skip ?
 	return;
@@ -86,7 +87,7 @@ function fleio_update_invoice_hook($vars) {
             continue;
 	}
         try {
-            $fl = Fleio::fromProdId($item->relid);
+            $fl = Fleio::fromServiceId($item->relid);
         } catch (Exception $e) {
             logActivity('Unable to initialize the Fleio module: ' . $e->getMessage());
             return;
@@ -120,9 +121,12 @@ function fleio_update_invoice_hook($vars) {
 
 function openstack_change_funds($invoiceid, $substract=False) {
     $items = Capsule::table('tblinvoiceitems')->where('invoiceid', '=', $invoiceid)->get();
-    $fleioProductIds = FleioUtils::getFleioProductsIds();
     foreach($items as $item) {
-        if (in_array($item->relid, $fleioProductIds)) {
+        if (FleioUtils::isFleioService($item->relid)) {
+            # Make sure the service is active. If it's not active, the credit will get lost! TODO(tomo)
+            $service = FleioUtils::getServiceById($item->relid);
+            if ($service->domainstatus != 'Active') { logActivity('Ignoring inactive fleio Service ID: ' . $item->relid); continue; }
+            # If the service is active, continue with the invoice.
             $currency = getCurrency($item->userid);
             $defaultCurrency = getCurrency();
             $convertedAmount = $item->amount; // Amount in client's currency
@@ -131,7 +135,7 @@ function openstack_change_funds($invoiceid, $substract=False) {
                 $convertedAmount = (-1 * $convertedAmount);
                 $amount = (-1 * $amount);
             }
-            $fl = Fleio::fromProdId($item->relid);
+            $fl = Fleio::fromServiceId($item->relid);
             $msg_format = "Changing Fleio credit for WHMCS User ID: %s with %.02f %s (%.02f %s from Invoice ID: %s)";
             $msg = sprintf($msg_format, $item->userid, $amount, $defaultCurrency["code"], $convertedAmount, $currency["code"], $invoiceid);
             logActivity($msg);
@@ -148,18 +152,9 @@ function openstack_change_funds($invoiceid, $substract=False) {
 }
 
 
-function openstack_add_funds_hook($vars) {
-    # Ignore the invoice if it's related to a fleio product creation (the initial invoice).
-    # TODO(tomo): Find a better way. This is here to avoid a double credit addition triggerd by InvoicePaid and PostServiceCreate events
-    $order = Capsule::table('tblorders')->where('invoiceid', '=', $vars["invoiceid"])->first();
-    if (!isset($order)) {
-        openstack_change_funds($vars["invoiceid"]);
-    }
-}
+function openstack_add_funds_hook($vars) { openstack_change_funds($vars["invoiceid"]); }
 
-function openstack_del_credit_hook($vars) {
-    openstack_change_funds($vars["invoiceid"], True);
-}
+function openstack_del_credit_hook($vars) { openstack_change_funds($vars["invoiceid"], True); }
 
 function fleio_ClientAreaPrimarySidebar(MenuItem $pn) {
     $actionsNav = $pn->getChild("Service Details Actions");
@@ -172,26 +167,36 @@ function fleio_ClientAreaPrimarySidebar(MenuItem $pn) {
     }
 }
 
-function openstack_add_initial_credit($vars) {
+/*
+function fleio_add_initial_credit($vars) {
+    logActivity('After Module Create');
     $params = $vars['params'];
-    if ($params['moduletype'] != "fleio") { return ""; }
+    if ($params['moduletype'] != 'fleio') { return ''; }
+    # Get the first invoice (associated with the order)
     $invoice = Capsule::table('tblhosting')
         ->join('tblorders', 'tblorders.id', '=', 'tblhosting.orderid')
         ->join('tblinvoices', 'tblorders.invoiceid', '=', 'tblinvoices.id')
         ->where('tblhosting.id', '=', (string) $params['serviceid'])
-        ->select('tblinvoices.*')
+        ->select('tblinvoices.status', 'tblinvoices.id')
         ->first();
     if (!isset($invoice->id)) {
-        return "";
+        return '';
     }
+    # Get only the items associated with fleio (an invoice can contain any number/types of items)
     Capsule::table('tblinvoiceitems')
             ->where('invoiceid', (string) $invoice->id)
             ->where('relid', (string) $params['serviceid'])
-            ->update(array("type"=>"Hosting")); 
+            ->update(array("type"=>"Hosting"));
     if ($invoice->status == 'Paid') {
         logActivity("Adding initial Fleio credit from Invoice ID: " . (string) $invoice->id);
-        openstack_change_funds($invoice->id);
+        try {
+          openstack_change_funds($invoice->id);
+        } catch (Exception $e) {
+          FleioUtils::addQueueTask($params['serviceid'], 'AddInitialCreditRetry', $e->getMessage());
+          logActivity('Unable to add initial credit from Invoice ID: ' . $invoice->id . ' ;' . $e->getMessage());
+        }
     } else {
-        logActivity("Invoice status is unpaid, not adding credit in Fleio");
+        logActivity("Invoice ID: " . $invoice->id . " status is unpaid, not adding credit in Fleio");
     }
 }
+*/

@@ -4,8 +4,8 @@ if (!defined("WHMCS")) {
     die("This file cannot be accessed directly");
 }
 
-require_once __DIR__ . '/api.php';
-use Illuminate\Database\Capsule\Manager as Capsule;
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'api.php';
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'utils.php';
 
 function fleio_MetaData()
 {
@@ -135,7 +135,7 @@ function fleio_login($params) {
         header("Location: " . $url);
         return "success";
     } catch (FlApiException $e) {
-        //TODO(tomo): Handle the $e->getMessage() message
+        logActivity('Fleio SSO login error: ' . $e->getMessage());
         return "Unable to retrieve a SSO session";
     }
 }
@@ -284,6 +284,7 @@ function validateAmount($original_amount, $min, $max) {
 
 
 function actionCreateInvoice($params, $request) {
+    # Action used for the Add Credit functionality
     $min_amount = $params['configoption5'];
     $max_amount = $params['configoption6'];
     // Min/Max in client's currency
@@ -297,29 +298,23 @@ function actionCreateInvoice($params, $request) {
         $overview_vars = actionOverview($params, $request);
         return array_merge($overview_vars, array('validateAmountError' => $e->getMessage(),));
     }
+ 
+    $service = FleioUtils::getServiceById($params['serviceid']);
     $clientsdetails = $params['clientsdetails'];
-
-    $command = "createinvoice";
     $values["userid"] = $clientsdetails['userid'];
-    $values["date"] = toMySQLDate(getTodaysDate());
-    $values["duedate"] = toMySQLDate(getTodaysDate());
-    $values["sendinvoice"] = false;
-    $values["itemdescription1"] = 'Fleio cloud services';
+    $values["sendinvoice"] = true;
+    $values["itemdescription1"] = $service->name;
     $values["itemamount1"] = $amount;
     $values["itemtaxed1"] = true;
 
-    $results = localAPI($command,$values,$ADMIN_USER);
+	$invoice_id = FleioUtils::createFleioInvoice($params['serviceid'], $values);
+	$log_msg = "User ID: ".$clientsdetails['userid']." adding ".formatCurrency($amount)." as Fleio credit. Invoice ID: ".$results["invoiceid"];
+	logActivity($log_msg);
 
-    if ($results["result"] == "success") {
-        # Invoice created.
-        $log_msg = "User ID: ".$clientsdetails['userid']." adding ".formatCurrency($amount)." as Fleio credit. Invoice ID: ".$results["invoiceid"];
-        logActivity($log_msg);
-        Capsule::table('tblinvoiceitems')
-            ->where('invoiceid', $results['invoiceid'])
-            ->where('userid', $clientsdetails['userid'])
-            ->update(array("type"=>"Hosting", "relid"=>$params['serviceid']));
-        redir("id=".(int)$results["invoiceid"],"viewinvoice.php");
-    } else {
-        throw new Exception($results["message"]);
-    }
+	redir("id=".(int) $invoice_id,"viewinvoice.php");
+}
+
+
+function fleio_AddInitialCreditRetry($vars) {
+ return "Fail: retry not implemented";
 }

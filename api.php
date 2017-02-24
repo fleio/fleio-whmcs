@@ -30,7 +30,7 @@ class Fleio {
         return new self($server, $clientsdetails);
     }
 
-    public static function fromProdId($prodid) {
+    public static function fromServiceId($prodid) {
         # NOTE(tomo): prodid is actually a tblhosting object ID, not the tblproducts ID
         $prodid = (string) $prodid;
         if (!is_string($prodid) or empty($prodid)) { // empty treats "0" as empty. We assume a product id will never be 0.
@@ -39,7 +39,7 @@ class Fleio {
         $clientsdetails = Capsule::table('tblclients')->join('tblhosting', 'tblhosting.userid', '=', 'tblclients.id')->where('tblhosting.id', '=', $prodid)->first();
         $dbserver = Capsule::table('tblhosting')
             ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
-            ->select('tblproducts.configoption1', 'tblproducts.configoption2', 'tblproducts->configoption4')
+            ->select('tblproducts.configoption1', 'tblproducts.configoption2', 'tblproducts.configoption4')
             ->where('tblhosting.id', '=', $prodid)->first();
         $server = new stdClass;
         $server->url = $dbserver->configoption4;
