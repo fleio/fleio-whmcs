@@ -13,7 +13,6 @@ class FlApiRequestException extends FlApiException {}
 
 class Fleio {
     private $SERVER;
-    private $USER_PREFIX='whmcs';
 
     public function __construct(stdClass $server, stdClass $clientsdetails) {
         $this->SERVER = $server;
@@ -26,6 +25,7 @@ class Fleio {
         $server->url = $params['configoption4'];
         $server->frontend_url = $params['configoption2'];
         $server->token = $params['configoption1'];
+        $server->userPrefix = $params['configoption9'] ? $params['configoption9'] : 'whmcs';
         $clientsdetails = (object) $params['clientsdetails'];
         return new self($server, $clientsdetails);
     }
@@ -45,6 +45,7 @@ class Fleio {
         $server->url = $dbserver->configoption4;
         $server->frontend_url = $dbserver->configoption2;
         $server->token = $dbserver->configoption1;
+        $server->userPrefix = $dbserver->configoption9 ? $dbserver->configoption9 : 'whmcs';
         return new self($server, $clientsdetails);
     }
 
@@ -64,11 +65,11 @@ class Fleio {
         return $response['price'];
     }
 
-    public function createBillingClient($groups) {
+    public function createBillingClient($groups, $serviceId=NULL) {
         $url = '/clients';
         $currency = getCurrency();
-
-        $user = array("username" => $this->USER_PREFIX . $this->clientsdetails->userid,
+        $clientUsername = $this->server->userPrefix ? $this->server->userPrefix . $this->clientsdetails->userid : 'whmcs' . $this->clientsdetails->userid;
+        $user = array("username" => $clientUsername,
                       "email" => $this->clientsdetails->email,
                       "email_verified" => true,
                       "first_name" => $this->clientsdetails->firstname,
@@ -97,6 +98,14 @@ class Fleio {
             $client_groups = array_map('trim', explode(',', $groups, 10));
             $client['groups'] = $client_groups;
         };
+        # Set the username to display in Products/Services in WHMCS Admin
+        if ($serviceId) {
+          try {
+            Capsule::table( 'tblhosting' )
+                  ->where( 'id', '=', $serviceId )
+                  ->update(['username' => $clientUsername, 'password' => encrypt('set-in-fleio')]);
+          } catch (Exception $e) { logActivity('Unable to set the Fleio username in WHMCS: '. $e->getMessage()); }
+        }
         return $this->flApi->post($url, $client);
     }
 
@@ -158,15 +167,27 @@ class Fleio {
         $url = '/clients/' . $fleio_client_id . '/terminate';
         return $this->flApi->post($url);
     }
+    
+    public function updateCredit($amount, $currencyCode, $currencyRate, $convertedAmount, $invoiceId='') {
+        try {
+          $fleio_client_id = $this->getClientId();
+          $url = '/clients/' . $fleio_client_id . '/update_credit';
+          $params = array('amount' => $amount,
+                          'currency' => $currencyCode,
+                          'rate' => $currencyRate,
+                          'converted_amount' => $convertedAmount);        
+          return $this->flApi->post($url, $params); 
 
-    public function updateCredit($amount, $currencyCode, $currencyRate, $convertedAmount) {
-        $fleio_client_id = $this->getClientId();
-        $url = '/clients/' . $fleio_client_id . '/update_credit';
-        $params = array('amount' => $amount,
-                        'currency' => $currencyCode,
-                        'rate' => $currencyRate,
-                        'converted_amount' => $convertedAmount);
-        return $this->flApi->post($url, $params); 
+        } catch (Exception $e) {
+            $postData = ['clientid' => $this->clientsdetails->userid,
+                         'description' => 'Fleio unable to set credit from Invoice #' . $invoiceId,
+                         'amount' => $convertedAmount];
+            try {
+              localAPI('AddCredit', $postData);
+            } catch (Exception $e) {
+              logActivity('Fleio unable to update credit for Client ID: ' . $this->clientsdetails->userid . ' with ' . (string)$convertedAmount);
+            }
+        }
     }
 
 }
@@ -234,22 +255,23 @@ class FlApi {
     }
 
     private function parse_drf_error($drf_error, $httpcode) {
-    // If the http status is bigger than 399, it signals an error, throw it
-        if ($httpcode > 499) {
+        // If the http status is bigger than 399, it signals an error, throw it
+		$err_msg = 'Bad request with status ' . $httpcode;
+        if ($httpcode > 499) { // throw for 500 and above
             throw new FlApiRequestException('An internal Fleio API error occurred', $httpcode);
         }
-
-        if ($httpcode > 399) {
-            $err_msg = 'Bad request with status ' . $httpcode;
-            if (is_array($drf_error)) {
-                if (array_key_exists('detail', $drf_error)) {
-                    $err_msg = (string)$drf_error->detail;
-                } else {
+		if (is_array($drf_error)) {
+			if (array_key_exists('detail', $drf_error)) {
+				$err_msg = (string)$drf_error['detail'];
+			} else {
+                try {
                     $err_msg = $this->drf_get_details($drf_error);
+                } catch (Exception $e) {
+                    $err_msg = 'bad request: ' . $httpdoce . '; Unable to parse error message.';
                 }
-            }
-            throw new FlApiRequestException($err_msg, $httpcode);
-        }
+			}
+		}
+		throw new FlApiRequestException($err_msg, $httpcode);
     }
 
     private function request( $ch, $method, $url ) {

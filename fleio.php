@@ -83,6 +83,13 @@ function fleio_ConfigOptions() {
         "Description" => "How WHMCS handles billing",
         "Default" => "Disabled"
     ),
+    "userprefix" => array (
+        "FriendlyName" => "Fleio username prefix",
+        "Type" => "text",
+        "Size" => "12",
+        "Description" => "Leave blank for 'whmcs'",
+        "Default" => "whmcs",
+    ),
     );
     return $configarray;
 }
@@ -90,7 +97,7 @@ function fleio_ConfigOptions() {
 function fleio_CreateAccount($params){
     $fl = Fleio::fromParams($params);
     try {
-        $fl->createBillingClient($params['configoption7']);
+        $fl->createBillingClient($params['configoption7'], $params['serviceid']);
     } catch (FlApiException $e) {
         return $e->getMessage();
     }
@@ -122,8 +129,7 @@ function fleio_TerminateAccount($params) {
     try {
         $result = $fl->terminateOpenstack();
     } catch (FlApiException $e) {
-        logactivity($e->getMessage());
-        return "Unable to terminate the account. See the activity logs for details.";
+        return ($e->getMessage());
     }
     return "success";
 }
@@ -146,7 +152,6 @@ function fleio_ClientAreaCustomButtonArray() {
     );
     return $buttonarray;
 }
-
 
 /**
  * Client area output logic handling.
@@ -308,13 +313,9 @@ function actionCreateInvoice($params, $request) {
     $values["itemtaxed1"] = true;
 
 	$invoice_id = FleioUtils::createFleioInvoice($params['serviceid'], $values);
-	$log_msg = "User ID: ".$clientsdetails['userid']." adding ".formatCurrency($amount)." as Fleio credit. Invoice ID: ".$results["invoiceid"];
+	$log_msg = "User ID: ".$clientsdetails['userid']." adding ".formatCurrency($amount)." as Fleio credit. Invoice ID: ". $invoice_id;
 	logActivity($log_msg);
 
 	redir("id=".(int) $invoice_id,"viewinvoice.php");
 }
 
-
-function fleio_AddInitialCreditRetry($vars) {
- return "Fail: retry not implemented";
-}

@@ -16,29 +16,13 @@ class FleioUtils {
         return Capsule::table('tbladmins')->where('roleid', '=', 1)->limit(1)->value('username');
       } catch ( Exception $e) {
         logActivity('Fleio: unable to get an admin username: '. $e->getMessage());
-        return NULL;
+        return;
       }
     }
 
     public static function addQueueTask($serviceId, $action, $errmsg='', $serviceType='service') {
       # Adds a task to Utilities -> Module Queue to allow admins to retry the operation
       return ModuleQueue::add($serviceType, $serviceId, 'fleio', $action, $errmsg);    
-    }
-
-    public static function isFleioService($serviceId) {
-      # Return true if a service is of type fleio
-      try {
-        $service = Capsule::table('tblhosting AS th')
-                           ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
-                           ->where('th.id', '=', $serviceId)
-                           ->where('tp.servertype', '=', 'fleio')
-                           ->select('th.id', 'tp.id AS prodid')->first();
-      } catch (Exception $e) {
-        return false;
-      }
-	  if ($service->id) {
-        return true;
-      }
     }
 
 	public static function getServiceById($serviceId) {
@@ -83,27 +67,16 @@ class FleioUtils {
       }
     }
 
- 	public static function getFleioProductsIds() {
-      # Retrieve all the Fleio products ids
-      # NOTE(tomo): We may be able to optimize this since it's the same as the getFleioProducts() function
-	  $products = self::getFleioProducts();
-	  $prod_ids = array();
-	  foreach($products as $product) {
-		array_push($prod_ids, $product->id);
-	  }
-	  return $prod_ids;
-	}
- 
     public static function getBillingHistory($flApi, $end_date=NULL) {
 		$url = '/openstack/billing/history';
 		$params = array();
 		if (!is_null($end_date)) {
 		   $params['end_date'] = $end_date;
 		}
-		#$response = $flApi->get($url, $params);
-		$client1 = ['client' => ['external_billing_id' => ''], 'price' => 234];
-		$client2 = ['client' => ['external_billing_id' => 'c9987cc2-82fd-4d3d-b3f4-006f88f8b7c4'], 'price' => 334];
-		$response = ['objects' => [$client1, $client2]];
+		$response = $flApi->get($url, $params);
+		#$client1 = ['client' => ['external_billing_id' => ''], 'price' => 234];
+		#$client2 = ['client' => ['external_billing_id' => 'c9987cc2-82fd-4d3d-b3f4-006f88f8b7c4'], 'price' => 334];
+		#$response = ['objects' => [$client1, $client2]];
         logModuleCall('fleio', 'getBillingHistory', $params, $response, $response['objects'], array());
 		if ($response == null) {
 			throw new FlApiRequestException("Unable to retrieve the billing history", 409);
@@ -117,7 +90,7 @@ class FleioUtils {
       global $CONFIG;
       $data['date'] = $data['date'] ? $data['date'] : date('Y-m-d');
       if (!$data['duedate']) {
-          #$duedays = $CONFIG['CreateInvoiceDaysBeforeMonthly'] ? $CONFIG['CreateInvoiceDaysBeforeMonthly'] : $CONFIG['CreateInvoiceDaysBefore'];
+          #TODO(tomo): $duedays = $CONFIG['CreateInvoiceDaysBeforeMonthly'] ? $CONFIG['CreateInvoiceDaysBeforeMonthly'] : $CONFIG['CreateInvoiceDaysBefore'];
           $duedays = $CONFIG['CreateInvoiceDaysBefore'];
           $dueDateTime = new DateTime($data['date']);
           $dueDateTime->modify('+' . $duedays . ' day');
@@ -135,6 +108,5 @@ class FleioUtils {
         throw new Exception($result["message"]);         
       }
     }
-
 }
 
