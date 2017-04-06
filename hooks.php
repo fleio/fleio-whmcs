@@ -15,7 +15,7 @@ add_hook("InvoiceRefunded", 99, "openstack_del_credit_hook");
 add_hook("ClientAreaPrimarySidebar", 99, "fleio_ClientAreaPrimarySidebar");
 add_hook("ClientAreaPrimaryNavbar", 99, "fleio_ClientAreaPrimaryNavbar");
 add_hook("InvoiceCreation", 99, "fleio_update_invoice_hook");
-add_hook("DailyCronJob", 99, "fleio_cronjob");
+//add_hook("DailyCronJob", 99, "fleio_cronjob"); // NOTE(tomo): Automatically creates invoices in WHMCS for clients
 
 function fleio_cronjob($vars) {
     logActivity('Fleio: daily cron start');
