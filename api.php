@@ -25,7 +25,8 @@ class Fleio {
         $server->url = $params['configoption4'];
         $server->frontend_url = $params['configoption2'];
         $server->token = $params['configoption1'];
-        $server->userPrefix = $params['configoption9'] ? $params['configoption9'] : 'whmcs';
+        $server->userPrefix = !empty(trim($params['configoption9'])) ? trim($params['configoption9']) : 'whmcs';
+        $server->ClientBillingSettings = !empty(trim($params['configoption8'])) ? trim($params['configoption8']) : NULL;
         $clientsdetails = (object) $params['clientsdetails'];
         return new self($server, $clientsdetails);
     }
@@ -39,13 +40,14 @@ class Fleio {
         $clientsdetails = Capsule::table('tblclients')->join('tblhosting', 'tblhosting.userid', '=', 'tblclients.id')->where('tblhosting.id', '=', $prodid)->first();
         $dbserver = Capsule::table('tblhosting')
             ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
-            ->select('tblproducts.configoption1', 'tblproducts.configoption2', 'tblproducts.configoption4')
+            ->select('tblproducts.configoption1', 'tblproducts.configoption2', 'tblproducts.configoption4', 'tblproducts.configoption8', 'tblproducts.configoption9')
             ->where('tblhosting.id', '=', $prodid)->first();
         $server = new stdClass;
         $server->url = $dbserver->configoption4;
         $server->frontend_url = $dbserver->configoption2;
         $server->token = $dbserver->configoption1;
-        $server->userPrefix = $dbserver->configoption9 ? $dbserver->configoption9 : 'whmcs';
+        $server->userPrefix = !empty(trim($dbserver->configoption9)) ? trim($dbserver->configoption9) : 'whmcs';
+        $server->ClientBillingSettings = !empty(trim($dbserver->configoption8)) ? trim($dbserver->configoption8) : NULL;
         return new self($server, $clientsdetails);
     }
 
@@ -68,7 +70,7 @@ class Fleio {
     public function createBillingClient($groups, $serviceId=NULL) {
         $url = '/clients';
         $currency = getCurrency();
-        $clientUsername = $this->server->userPrefix ? $this->server->userPrefix . $this->clientsdetails->userid : 'whmcs' . $this->clientsdetails->userid;
+        $clientUsername = $this->SERVER->userPrefix ? $this->SERVER->userPrefix . $this->clientsdetails->userid : 'whmcs' . $this->clientsdetails->userid;
         $user = array("username" => $clientUsername,
                       "email" => $this->clientsdetails->email,
                       "email_verified" => true,
@@ -94,7 +96,11 @@ class Fleio {
                         'user' => $user,
                         'create_openstack_project' => true);
 
-        if (isset($groups) && trim($groups) != '') {
+        $cbset = $this->SERVER->ClientBillingSettings;
+		if (!empty($cbset)) {
+			$client['billing_settings'] = $cbset;
+		};
+        if (!empty($groups) && trim($groups) != '') {
             $client_groups = array_map('trim', explode(',', $groups, 10));
             $client['groups'] = $client_groups;
         };

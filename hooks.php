@@ -21,10 +21,6 @@ function fleio_cronjob($vars) {
     logActivity('Fleio: daily cron start');
     $fleioServers = FleioUtils::getFleioProducts();
     foreach($fleioServers as $server) {
-        if ($server->configoption8 != 'postpaid') {
-          # This server is not configured for post payments, we ignore it.
-          continue;
-        }
         $flApi = new FlApi($server->configoption4, $server->configoption1);
         try {
             $bhistories = FleioUtils::getBillingHistory($flApi, date('Y-m-d'));

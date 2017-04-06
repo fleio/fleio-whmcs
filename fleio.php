@@ -72,16 +72,12 @@ function fleio_ConfigOptions() {
         "Description" => "",
         "Default" => "",
     ),
-    "billingtype" => array (
-        "FriendlyName" => "Billing type",
-        "Type" => "dropdown",
-        "Options" => [
-            'disabled' => 'Disabled',
-            'prepaid' => 'Pre-Paid',
-            'postpaid' => 'Post-Paid'
-        ],
-        "Description" => "How WHMCS handles billing",
-        "Default" => "Disabled"
+    "billingsettings" => array (
+        "FriendlyName" => "Fleio Billing Settings",
+        "Type" => "text",
+		"Size" => "10",
+        "Description" => "Leave blank for default",
+        "Default" => ""
     ),
     "userprefix" => array (
         "FriendlyName" => "Fleio username prefix",
