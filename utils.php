@@ -13,7 +13,7 @@ class FleioUtils {
     public static function getWHMCSAdmin() {
       # Get the first WHMCS admin username (usually for localApi requests).
       try {
-        return Capsule::table('tbladmins')->where('roleid', '=', 1)->limit(1)->value('username');
+        return Capsule::table('tbladmins')->where([['roleid', '=', 1], ['disabled', '=', 0]])->limit(1)->value('username');
       } catch ( Exception $e) {
         logActivity('Fleio: unable to get an admin username: '. $e->getMessage());
         return;
@@ -96,8 +96,15 @@ class FleioUtils {
           $dueDateTime->modify('+' . $duedays . ' day');
           $data['duedate'] = $dueDateTime->format('Y-m-d');
       }
+      // Get an admin username
+      try {
+          $adminUsername = self::getWHMCSAdmin();
+      } catch (Exception $e) {
+          logActivity('Fleio: ' . $e->getMessage());
+          throw new Exception('Unable to create invoice'); // We do not throw the original message since it may contain sensitive data
+      }
 
-	  $result = localAPI('CreateInvoice', $data);
+	  $result = localAPI('CreateInvoice', $data, $adminUsername);
       if ($result["result"] == "success") {
 	    $invoice_id = $result['invoiceid'];
 	    Capsule::table('tblinvoiceitems')

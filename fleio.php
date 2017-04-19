@@ -309,7 +309,7 @@ function actionCreateInvoice($params, $request) {
     $values["itemtaxed1"] = true;
 
 	$invoice_id = FleioUtils::createFleioInvoice($params['serviceid'], $values);
-	$log_msg = "User ID: ".$clientsdetails['userid']." adding ".formatCurrency($amount)." as Fleio credit. Invoice ID: ". $invoice_id;
+	$log_msg = "Fleio: User ID: ".$clientsdetails['userid']." created credit Invoice ID: ".$invoice_id." with amount ".formatCurrency($amount);
 	logActivity($log_msg);
 
 	redir("id=".(int) $invoice_id,"viewinvoice.php");
