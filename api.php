@@ -122,15 +122,15 @@ class Fleio {
         $query_params = array('external_billing_id' => $this->clientsdetails->uuid);
         $response = $this->flApi->get($url, $query_params);
         if ($response == null) {
-            throw new FlApiRequestException("Unable to retrieve the Fleio client ID", 404);
+            throw new FlApiRequestException("Unable to retrieve the Fleio client with external billing id: " . (string)$this->clientsdetails->uuid, 400);
         }
         $objects = $response['objects'];
         if (count($objects) > 1) {
-            throw new FlApiRequestException("Unable to retrieve the Fleio client ID", 409); // Multiple objects returned
+            throw new FlApiRequestException("Unable to retrieve the Fleio client with external billing id: " . (string)$this->clientsdetails->uuid, 409); // Multiple objects returned
         }
         if (count($objects) == 0) {
-           throw new FlApiRequestException("Unable to retrieve the Fleio client ID", 404);
-	}
+           throw new FlApiRequestException("Unable to retrieve the Fleio client with external billing id: " . (string)$this->clientsdetails->uuid, 404); // Not found
+        }
         return $objects[0]['id'];
     }
 
@@ -185,6 +185,7 @@ class Fleio {
           return $this->flApi->post($url, $params); 
 
         } catch (Exception $e) {
+            /** This used to add the amount to the WHMCS client credit balance if unable to update the fleio credit.
             $postData = ['clientid' => $this->clientsdetails->userid,
                          'description' => 'Fleio unable to set credit from Invoice #' . $invoiceId,
                          'amount' => $convertedAmount];
@@ -193,6 +194,9 @@ class Fleio {
             } catch (Exception $e) {
               logActivity('Fleio unable to update credit for Client ID: ' . $this->clientsdetails->userid . ' with ' . (string)$convertedAmount);
             }
+            **/
+           logActivity('Fleio unable to update credit for User ID: ' . $this->clientsdetails->userid . ' with ' . (string)$convertedAmount);
+           throw $e; 
         }
     }
 
