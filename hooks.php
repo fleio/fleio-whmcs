@@ -18,6 +18,10 @@ add_hook("InvoiceCreation", 99, "fleio_update_invoice_hook");
 //add_hook("DailyCronJob", 99, "fleio_cronjob"); // NOTE(tomo): Automatically creates invoices in WHMCS for clients
 
 function fleio_cronjob($vars) {
+    /*
+    Function that is executed each time the WHMCS daily cron runs.
+    This should check all Fleio products and create invoices for them.
+    */
     logActivity('Fleio: daily cron start');
     $fleioServers = FleioUtils::getFleioProducts();
     foreach($fleioServers as $server) {
@@ -67,39 +71,58 @@ function fleio_update_invoice_hook($vars) {
 	  return;
     }
     $invoice = Capsule::table('tblinvoices')->where('id', '=', $vars["invoiceid"])->first();
+    # NOTE(tomo): Select only Hosting type items. Otherwise we will end up with domains and other types being paid for.
     $items = Capsule::table('tblinvoiceitems')->where('invoiceid', '=', $vars["invoiceid"])->get();
     $tax = 0.0;
     $tax2 = 0.0;
     $subtotal_price = 0.0;
+    $cost_by_service = array();
+    $product_prices = array();
     foreach($items as $item) {
+        # NOTE(tomo): Check if relid is set and not an empty string
+        if (($item->relid == '') || !(isset($item->relid))) {
+           continue;
+        }
+        if (isset($cost_by_service[$item->relid])) {
+            $cost_by_service[$item->relid] += $item->amount;
+        } else {
+            $cost_by_service[$item->relid] = $item->amount;
+        }
+    }
+
+    foreach($items as $item) {
+        if (($item->type != 'Hosting') || !isset($cost_by_service[$item->relid])) {
+           continue;
+        }
         $product = Capsule::table('tblinvoiceitems')
                            ->join('tblhosting', 'tblinvoiceitems.relid', '=', 'tblhosting.id')
                            ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
-                           ->where('tblinvoiceitems.relid', '=', $item->relid)
+                           ->where([['tblinvoiceitems.relid', '=', $item->relid], ['tblproducts.servertype', '=', 'fleio'], ['tblhosting.domainstatus', '<>', 'Pending'], ['tblinvoiceitems.type', '=', 'Hosting']])
                            ->select('tblproducts.servertype', 'tblhosting.domainstatus')->first();
-        if ($product->servertype != 'fleio' || $product->domainstatus == 'Pending') {
-            # Item on invoice is not related to fleio, or this is a pending service and
-            # the account is not created yet. Continue to the next invoice item
+        if ($product === null) {
             continue;
-	    }
+        }
         try {
             $fl = Fleio::fromServiceId($item->relid);
         } catch (Exception $e) {
-            logActivity('Unable to initialize the Fleio module: ' . $e->getMessage());
+            logActivity('Fleio: unable to initialize the Fleio API module: ' . $e->getMessage());
             continue;
         }
         # If the product is active, try to get the price from Fleio billing
         try {
             $price = $fl->getBillingPrice();
-        } catch (FlApiRequestException $e) {
-            logActivity($e->getMessage());
+        } catch (FlApiException $e) {
+            logActivity('Fleio: unable to get the billing price for Service ID: ' . $item->relid . ' : ' . $e->getMessage());
             # NOTE(tomo): Deleting the item will cause a retry on the next run, which we want but there
-            # are other complications. Comment for now and set the price to 0
-            Capsule::table('tblinvoiceitems')->where('id', '=', $item->id)->delete();
+            # are other complications.
+            # Also note that an invoice may contain multiple entries with the same relid (eg: Setup and Hosting types costs for a product).
+            #Capsule::table('tblinvoiceitems')->where('id', '=', $item->id)->delete();
+            #logActivity('Fleio: deleted service ID: ' . $item->relid . ' from Invoice ID: ' . $invoice->id);
             continue;
         }
+        # NOTE(tomo): The price of a Fleio item is usually 0, until we set it from Fleio.
         Capsule::table('tblinvoiceitems')
-               ->where('id', (string) $item->id)
+               ->where([['id', (string) $item->id], ['type', '=', 'Hosting']])
                ->increment('amount', $price);
         if ($item->taxed) {
             $tax += $price * $invoice->taxrate / 100;
@@ -109,23 +132,53 @@ function fleio_update_invoice_hook($vars) {
     }
     $total_price = $subtotal_price + $tax + $tax2;
     if ($total_price > 0) {
-        #Capsule::table('tblinvoices')->where('id', '=', $vars["invoiceid"])->delete();
-        #logactivity('Invoice with id '.((string) $vars["invoiceid"]).' deleted');
-        Capsule::table('tblinvoices')->where('id', '=', $vars["invoiceid"])->update(array("subtotal"=>$total_price, "tax"=>$tax, "tax2"=>$tax2, "total"=>$total_price));
+        # Capsule::table('tblinvoices')->where('id', '=', $vars['invoiceid'])->update(array("subtotal"=>$total_price, "tax"=>$tax, "tax2"=>$tax2, "total"=>$total_price));
+        logActivity('Fleio: incrementing price of Invoice ID: '. $vars['invoiceid'] . ' with ' . $total_price . ' and tax with ' . $tax . ' and tax2 with ' . $tax2);
+        Capsule::table('tblinvoices')->where('id', '=', $vars['invoiceid'])->increment('subtotal', $subtotal_price);
+        Capsule::table('tblinvoices')->where('id', '=', $vars['invoiceid'])->increment('total', $total_price);
+        Capsule::table('tblinvoices')->where('id', '=', $vars['invoiceid'])->increment('tax', $tax);
+        Capsule::table('tblinvoices')->where('id', '=', $vars['invoiceid'])->increment('tax2', $tax2);
+        logActivity('Fleio: prices and taxes updated for Invoice ID: ' . $vars['invoiceid']);
     }
 }
 
 function openstack_change_funds($invoiceid, $substract=False) {
+    /*
+    Check all invoice items and for each Fleio product, either add or
+    remove credit based on the total item costs and the action performed.
+    */
     $items = Capsule::table('tblinvoiceitems')->where('invoiceid', '=', $invoiceid)->get();
+
+    $cost_by_service = array();
     foreach($items as $item) {
+        # NOTE(tomo): Check if relid is set and not an empty string
+        if (($item->relid == '') || !isset($item->relid)) {
+           continue;
+        }
+        if (isset($cost_by_service[$item->relid])) {
+            $cost_by_service[$item->relid] += $item->amount;
+        } else {
+            $cost_by_service[$item->relid] = $item->amount;
+        }
+    }
+
+    foreach($items as $item) {
+        if (($item->type != 'Hosting') || !isset($cost_by_service[$item->relid])) {
+           continue;
+        }
+        # We now know that relid is a Hosting package (not a Domain for example)
         $service = FleioUtils::getServiceById($item->relid);
         if ($service->servertype == 'fleio') {
             # NOTE(tomo): Make sure the service is active. If it's not active and we don't handle this, the credit is lost.
             # NOTE(tomo): We currently handle this in the updateCredit method.
             $currency = getCurrency($item->userid);
             $defaultCurrency = getCurrency();
-            $convertedAmount = $item->amount; // Amount in client's currency
-            $amount = convertCurrency($convertedAmount, $currency['id']);  // Amount in default currency
+            $convertedAmount = $cost_by_service[$item->relid]; // Amount + Setup and/or other related prices in client's currency
+            $amount = convertCurrency($convertedAmount, $currency['id']);  // Amount in default currency. NOTE(tomo): Fleio needs to use the WHMCS default currency
+            if ($amount == 0) {
+               logActivity('Fleio: ignoring Service ID: '. $item->relid . ' with cost equal to 0 from Invoice ID: ' . $invoiceid);
+               continue;
+            }
             if ($substract) {
                 $convertedAmount = (-1 * $convertedAmount);
                 $amount = (-1 * $amount);
@@ -141,7 +194,7 @@ function openstack_change_funds($invoiceid, $substract=False) {
                 logActivity("Unable to update the client credit in Fleio: " . $e->getMessage()); 
                 return;
             }
-            logActivity("Successfully changed credit with ".$amount." ".$defaultCurrency["code"]." for Fleio client id: ".$response['client'].". New Fleio balance: ".$response['credit_balance']); 
+            logActivity("Successfully changed Fleio credit with ".$amount." ".$defaultCurrency["code"]." for Fleio client id: ".$response['client'].". New Fleio balance: ".$response['credit_balance']); 
         }
     }
 }
