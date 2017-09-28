@@ -31,7 +31,7 @@ class FleioUtils {
         $prod = Capsule::table('tblhosting AS th')
                        ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
                        ->where('th.id', '=', $serviceId)
-                       ->select('th.*', 'tp.name', 'tp.description', 'tp.servergroup', 'tp.tax', 'tp.servertype', 'tp.configoption8 AS billingsettings')
+                       ->select('th.*', 'tp.name', 'tp.description', 'tp.servergroup', 'tp.tax', 'tp.servertype', 'tp.configoption8 AS configuration')
                        ->first();
       } catch (Exception $e) {
         logActivity('Fleio: unable to get the fleio product with ID: ' . $serviceId . '; ' . $e->getMessage());
@@ -48,7 +48,7 @@ class FleioUtils {
 					  ->where('th.userid', '=', $clientId)
 					  ->where('th.domainstatus', '=', $status)
 					  ->where('tp.servertype', '=', 'fleio')
-                      ->select('th.*', 'tp.name', 'tp.description', 'tp.servergroup', 'tp.tax', 'tp.configoption8 AS billingsettings')
+                      ->select('th.*', 'tp.name', 'tp.description', 'tp.servergroup', 'tp.tax', 'tp.configoption8 AS configuration')
 					  ->first();
 	  } catch (Exception $e) {
 		  logActivity('Fleio: unable to get the fleio product id for '. $clientId . '. ' . $e->getMessage());

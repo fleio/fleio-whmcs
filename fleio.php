@@ -72,11 +72,11 @@ function fleio_ConfigOptions() {
         "Description" => "",
         "Default" => "",
     ),
-    "billingsettings" => array (
-        "FriendlyName" => "Fleio Billing Settings",
+    "configuration" => array (
+        "FriendlyName" => "Fleio Configuration Name",
         "Type" => "text",
-		"Size" => "10",
-        "Description" => "Leave blank for default",
+		"Size" => "32",
+        "Description" => "Configuration name to set for Fleio clients",
         "Default" => ""
     ),
     "userprefix" => array (

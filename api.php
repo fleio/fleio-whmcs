@@ -26,7 +26,7 @@ class Fleio {
         $server->frontend_url = $params['configoption2'];
         $server->token = $params['configoption1'];
         $server->userPrefix = !empty(trim($params['configoption9'])) ? trim($params['configoption9']) : 'whmcs';
-        $server->ClientBillingSettings = !empty(trim($params['configoption8'])) ? trim($params['configoption8']) : NULL;
+        $server->ClientConfiguration = !empty(trim($params['configoption8'])) ? trim($params['configoption8']) : NULL;
         $clientsdetails = (object) $params['clientsdetails'];
         return new self($server, $clientsdetails);
     }
@@ -47,7 +47,7 @@ class Fleio {
         $server->frontend_url = $dbserver->configoption2;
         $server->token = $dbserver->configoption1;
         $server->userPrefix = !empty(trim($dbserver->configoption9)) ? trim($dbserver->configoption9) : 'whmcs';
-        $server->ClientBillingSettings = !empty(trim($dbserver->configoption8)) ? trim($dbserver->configoption8) : NULL;
+        $server->ClientConfiguration = !empty(trim($dbserver->configoption8)) ? trim($dbserver->configoption8) : NULL;
         return new self($server, $clientsdetails);
     }
 
@@ -96,9 +96,9 @@ class Fleio {
                         'user' => $user,
                         'create_openstack_project' => true);
 
-        $cbset = $this->SERVER->ClientBillingSettings;
+        $cbset = $this->SERVER->ClientConfiguration;
 		if (!empty($cbset)) {
-			$client['billing_settings'] = $cbset;
+			$client['configuration'] = $cbset;
 		};
         if (!empty($groups) && trim($groups) != '') {
             $client_groups = array_map('trim', explode(',', $groups, 10));
