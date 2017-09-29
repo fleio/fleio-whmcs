@@ -170,26 +170,31 @@ function openstack_change_funds($invoiceid, $substract=False) {
         $service = FleioUtils::getServiceById($item->relid);
         if ($service->servertype == 'fleio') {
             # NOTE(tomo): Make sure the service is active. If it's not active and we don't handle this, the credit is lost.
-            # NOTE(tomo): We currently handle this in the updateCredit method.
-            $currency = getCurrency($item->userid);
+            # NOTE(tomo): We currently handle this in the add/remove credit methods.
+            $clientCurrency = getCurrency($item->userid);
             $defaultCurrency = getCurrency();
-            $convertedAmount = $cost_by_service[$item->relid]; // Amount + Setup and/or other related prices in client's currency
-            $amount = convertCurrency($convertedAmount, $currency['id']);  // Amount in default currency. NOTE(tomo): Fleio needs to use the WHMCS default currency
+            $clientAmount = $cost_by_service[$item->relid]; // Amount + Setup and/or other related prices in client's currency
+            # NOTE(tomo): Fleio needs to use the WHMCS default currency
+            $amount = convertCurrency($clientAmount, $clientCurrency['id']);  // Amount in default currency.
             if ($amount == 0) {
                logActivity('Fleio: ignoring Service ID: '. $item->relid . ' with cost equal to 0 from Invoice ID: ' . $invoiceid);
                continue;
             }
-            if ($substract) {
-                $convertedAmount = (-1 * $convertedAmount);
-                $amount = (-1 * $amount);
-            }
             $fl = Fleio::fromServiceId($item->relid);
-            $msg_format = "Changing Fleio credit for WHMCS User ID: %s with %.02f %s (%.02f %s from Invoice ID: %s)";
-            $msg = sprintf($msg_format, $item->userid, $amount, $defaultCurrency["code"], $convertedAmount, $currency["code"], $invoiceid);
+            if ($substract) {
+            	$msg_format = "Removing Fleio credit for WHMCS User ID: %s with %.02f %s (%.02f %s from Invoice ID: %s)";
+            } else {
+            	$msg_format = "Adding Fleio credit for WHMCS User ID: %s with %.02f %s (%.02f %s from Invoice ID: %s)";
+            }
+            $msg = sprintf($msg_format, $item->userid, $amount, $defaultCurrency["code"], $clientAmount, $clientCurrency["code"], $invoiceid);
             logActivity($msg);
             # TODO(tomo): We use the userid which can be a contact ?
             try {
-                $response = $fl->updateCredit($amount, $currency["code"], $currency["rate"], $convertedAmount, $invoiceid);
+                if ($substract) {
+                    $response = $fl->withdrawCredit($amount, $defaultCurrency["code"], $clientCurrency["rate"], $clientAmount, $clientCurrency["code"], $invoiceid);
+                } else {
+                	$response = $fl->addCredit($amount, $defaultCurrency["code"], $clientCurrency["rate"], $clientAmount, $clientCurrency["code"], $invoiceid);
+                }
             } catch (FlApiException $e) {
                 logActivity("Unable to update the client credit in Fleio: " . $e->getMessage()); 
                 return;
