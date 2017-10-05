@@ -8,10 +8,10 @@
     <div class="col-md-6">
         <div class="panel panel-default panel-height-150" id="FleioAddCreditPanel">
             <div class="panel-heading">
-                <h3 class="panel-title">Available cloud credit: {if $summary} {$summary.credit} {$summary.currency} {/if}</h3>
+                <h3 class="panel-title">Available cloud credit: {if $summary} {$summary.billing_credit} {$summary.billing_currency} {/if}</h3>
             </div>
             <div class="panel-body">
-                <span>The last billing cycle cost was: {$last_usage_price} {$summary.currency} {if ($summary.currency ne $currency.code) } ({$last_usage_price} {$currency.code}) {/if}</span>
+                <span>The last billing cycle cost was: {$last_usage_price} {$currency.code} {if ($summary.client_currency ne $currency.code) } ({$summary.last_usage_price} {$summary.client_currency}) {/if}</span>
                 <div class="col-lg-10 col-lg-offset-1">
                     <form role="form" method="post" action="clientarea.php?action=productdetails&id={$serviceid}">
                         <input type="hidden" name="customAction" value="createflinvoice" />
