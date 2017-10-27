@@ -94,7 +94,7 @@ class Fleio {
                         'external_billing_id' => $this->clientsdetails->uuid,
                         'currency' => $currency['code'],
                         'user' => $user,
-                        'create_openstack_project' => true);
+                        'create_openstack_service' => true);
 
         $cbset = $this->SERVER->ClientConfiguration;
 		if (!empty($cbset)) {
