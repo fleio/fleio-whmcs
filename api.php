@@ -171,7 +171,8 @@ class Fleio {
     public function terminateOpenstack() {
         $fleio_client_id = $this->getClientId();
         $url = '/clients/' . $fleio_client_id . '/terminate';
-        return $this->flApi->post($url);
+        $params = array('delete_cloud_resources' => 'true');
+        return $this->flApi->post($url, $params);
     }
 
     public function addCredit($amount, $currencyCode, $currencyRate, $clientAmount, $clientCurrency, $invoiceId='') {
