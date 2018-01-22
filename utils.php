@@ -51,7 +51,6 @@ class FleioUtils {
                       ->select('th.*', 'tp.name', 'tp.description', 'tp.servergroup', 'tp.tax', 'tp.configoption8 AS configuration')
 					  ->first();
 	  } catch (Exception $e) {
-		  logActivity('Fleio: unable to get the fleio product id for '. $clientId . '. ' . $e->getMessage());
 		  return NULL;
 	  }
 	  return $prod;

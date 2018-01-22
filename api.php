@@ -115,6 +115,13 @@ class Fleio {
         return $this->flApi->post($url, $client);
     }
 
+    public function updateFleioClient($details) {
+        // Update the Fleio Client details
+        $fleioClientId = $this->getClientId();
+        $url = '/clients/'.$fleioClientId;
+        return $this->flApi->patch($url, $details);
+    }
+
     private function getClientId() {
         /* Get the Fleio client id from the WHMCS user id */
         # TODO(tomo): throw if the clientId is not found
@@ -234,6 +241,18 @@ class FlApi {
         }
         $response = $this->request($ch, 'POST', $url);
         curl_close($ch); 
+        return $response;
+    }
+
+    public function patch( $url, $params ) {
+        $ch = curl_init();
+        if (is_array($params)) {
+            $json_params = json_encode($params);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $json_params);
+            $this->TEMP_HEADERS[] = 'Content-Length: ' . mb_strlen($json_params);
+        }
+        $response = $this->request($ch, 'PATCH', $url);
+        curl_close($ch);
         return $response;
     }
 

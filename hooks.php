@@ -17,6 +17,7 @@ add_hook("ClientAreaPrimaryNavbar", 99, "fleio_ClientAreaPrimaryNavbar");
 add_hook("InvoiceCreation", 99, "fleio_update_invoice_hook");
 add_hook("UpdateInvoiceTotal", 99, "fleio_test");
 //add_hook("DailyCronJob", 99, "fleio_cronjob"); // NOTE(tomo): Automatically creates invoices in WHMCS for clients
+add_hook("ClientEdit", 99, "fleio_client_edit");
 
 function fleio_cronjob($vars) {
     /*
@@ -235,6 +236,37 @@ function fleio_ClientAreaPrimarySidebar(MenuItem $pn) {
     $navItem = $actionsNav->getChild('Custom Module Button Login to Fleio');
     if (!is_null($navItem)) {
         $navItem->setAttribute("target", '_blank');
+    }
+}
+
+function fleio_client_edit($vars) {
+    try {
+        $product = FleioUtils::getClientProduct($vars["userid"]);
+    } catch (Exception $e) {
+        return;
+    }
+
+    // if this client has no OpenStack products, return
+    if (!$product) { return; }
+    else {
+        $details = array("first_name" => $vars["firstname"],
+                         "last_name" => $vars["lastname"],
+                         "address1" => $vars["address1"],
+                         "address2" => $vars["address2"],
+                         "city" => $vars["city"],
+                         "state" => $vars["state"],
+                         "email" => $vars["email"],
+                         "zip_code" => $vars["postcode"],
+                         "country" => $vars["country"],
+                         "company" => $vars["companyname"],
+                         "phone" => $vars["phonenumber"]);
+    }
+    try {
+        $fl = Fleio::fromServiceId($product->id);
+        return $fl->updateFleioClient($details);
+    } catch (Exception $e) {
+        // FIXME(tomo): Catch all just in case...
+        return;
     }
 }
 
