@@ -10,11 +10,12 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 use WHMCS\View\Menu\Item as MenuItem;
 
 add_hook("InvoicePaid", 99, "openstack_add_funds_hook", "");
-add_hook("InvoiceUnpaid", 99, "openstack_del_credit_hook");
-add_hook("InvoiceRefunded", 99, "openstack_del_credit_hook");
+# add_hook("InvoiceUnpaid", 99, "openstack_del_credit_hook");  # disabled for now. Invoice can be Cancelled and marked Unpaid afterwards...
+# add_hook("InvoiceRefunded", 99, "openstack_del_credit_hook"); # disabled for now. Manual funds removal is necessary in Fleio.
 add_hook("ClientAreaPrimarySidebar", 99, "fleio_ClientAreaPrimarySidebar");
 add_hook("ClientAreaPrimaryNavbar", 99, "fleio_ClientAreaPrimaryNavbar");
 add_hook("InvoiceCreation", 99, "fleio_update_invoice_hook");
+add_hook("UpdateInvoiceTotal", 99, "fleio_test");
 //add_hook("DailyCronJob", 99, "fleio_cronjob"); // NOTE(tomo): Automatically creates invoices in WHMCS for clients
 
 function fleio_cronjob($vars) {
@@ -149,6 +150,19 @@ function openstack_change_funds($invoiceid, $substract=False) {
     */
     $items = Capsule::table('tblinvoiceitems')->where('invoiceid', '=', $invoiceid)->get();
 
+    // Retrieve the invoice total paid.
+    // If this invoice was not fully paid, we do not substract from Fleio.
+    // There is no other way to prevent subtracting from Fleio when cancelling an invoice and marking it unpaid afterwards
+    try {
+        $balance = Capsule::table('tblaccounts as ta')
+                        ->where('ta.invoiceid', '=', $invoiceid)
+                        ->join('tblinvoices as ti', 'ta.invoiceid', '=', 'ti.id')
+                        ->select(Capsule::raw('SUM(ta.amountin)-SUM(ta.amountout)-ti.total as balance'))
+                        ->value('balance');
+    } catch (Exception $e) {
+        logActivity($e->getMessage());
+        $balance = false;
+    }  
     $cost_by_service = array();
     foreach($items as $item) {
         # NOTE(tomo): Check if relid is set and not an empty string
@@ -180,6 +194,10 @@ function openstack_change_funds($invoiceid, $substract=False) {
                logActivity('Fleio: ignoring Service ID: '. $item->relid . ' with cost equal to 0 from Invoice ID: ' . $invoiceid);
                continue;
             }
+            if ($substract && $balance != false && $balance >= 0) {
+               logActivity('Fleio: ignoring Service ID: '. $item->relid .' from Invoice ID: ' . $invoiceid . ' with status Unpaid but fully paid');
+               continue;
+            }
             $fl = Fleio::fromServiceId($item->relid);
             if ($substract) {
             	$msg_format = "Removing Fleio credit for WHMCS User ID: %s with %.02f %s (%.02f %s from Invoice ID: %s)";
@@ -199,7 +217,7 @@ function openstack_change_funds($invoiceid, $substract=False) {
                 logActivity("Unable to update the client credit in Fleio: " . $e->getMessage()); 
                 return;
             }
-            logActivity("Successfully changed Fleio credit with ".$amount." ".$defaultCurrency["code"]." for Fleio client id: ".$response['client'].". New Fleio balance: ".$response['credit_balance']); 
+            logActivity("Successfully changed Fleio credit with ".$amount." ".$defaultCurrency["code"]. " for Fleio client id: ".$response['client'].". New Fleio balance: ".$response['credit_balance']." ".$defaultCurrency["code"]); 
         }
     }
 }
