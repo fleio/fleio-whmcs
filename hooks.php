@@ -15,7 +15,7 @@ add_hook("InvoicePaid", 99, "openstack_add_funds_hook", "");
 add_hook("ClientAreaPrimarySidebar", 99, "fleio_ClientAreaPrimarySidebar");
 add_hook("ClientAreaPrimaryNavbar", 99, "fleio_ClientAreaPrimaryNavbar");
 add_hook("InvoiceCreation", 99, "fleio_update_invoice_hook");
-add_hook("UpdateInvoiceTotal", 99, "fleio_test");
+//add_hook("UpdateInvoiceTotal", 99, "fleio_test");
 //add_hook("DailyCronJob", 99, "fleio_cronjob"); // NOTE(tomo): Automatically creates invoices in WHMCS for clients
 add_hook("ClientEdit", 99, "fleio_client_edit");
 
