@@ -122,7 +122,7 @@ class Fleio {
         return $this->flApi->patch($url, $details);
     }
 
-    private function getClientId() {
+    public function getClient() {
         /* Get the Fleio client id from the WHMCS user id */
         # TODO(tomo): throw if the clientId is not found
         $url = '/clients';
@@ -138,7 +138,12 @@ class Fleio {
         if (count($objects) == 0) {
            throw new FlApiRequestException("Unable to retrieve the Fleio client with external billing id: " . (string)$this->clientsdetails->uuid, 404); // Not found
         }
-        return $objects[0]['id'];
+        return $objects[0];
+    }
+
+	private function getClientId() {
+        $client = $this->getClient();
+        return $client['id'];
     }
 
     private function getSSOSession() {
@@ -155,12 +160,6 @@ class Fleio {
         $send_params = array_combine($params, explode(":", $rsp['hash_val']));
         $send_params = http_build_query($send_params);
         return  $url . $send_params;
-    }
-
-    public function getClientSummary() {
-        $client_id = $this->getClientId();
-        $url = '/clients/' . $client_id . '/usage_summary';
-        return $this->flApi->get($url);
     }
 
     public function suspendOpenstack() {

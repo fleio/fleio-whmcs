@@ -238,11 +238,12 @@ function actionOverview($params, $request) {
     $min_amount = $params['configoption5'];
     $max_amount = $params['configoption6'];
     // Min/Max in client's currency
-    $minamount = convertCurrency($min_amount, 1, $params['clientsdetails']['currency']);
-    $maxamount = convertCurrency($max_amount, 1, $params['clientsdetails']['currency']);
+    $whmcsClientCurrencyId = $params['clientsdetails']['currency'];
+    $minamount = convertCurrency($min_amount, 1, $whmcsClientCurrencyId);
+    $maxamount = convertCurrency($max_amount, 1, $whmcsClientCurrencyId);
     $fl = Fleio::fromParams($params);
     try {
-        $summary = $fl->getClientSummary();
+        $client = $fl->getClient();
     } catch (Exception $e) {
         logModuleCall(
             'fleio',
@@ -251,17 +252,26 @@ function actionOverview($params, $request) {
             $e->getMessage(),
             $e->getTraceAsString()
         );
-        $summary = False;
+        $client = False;
     };
     // Convert from Fleio client currency to the WHMCS client currency
-    if ($summary['last_usage_price'] && $summary['currency']) {
-        $last_usage_price = convertCurrency($summary['last_usage_price'], 1, $params['clientsdetails']['currency']);
-    } else { $last_usage_price = 0; };
+    $tax1 = getTaxRate(1, $params['clientsdetails']['state'], $params['clientsdetails']['countrycode']);
+    $tax2 = getTaxRate(2, $params['clientsdetails']['state'], $params['clientsdetails']['countrycode']);
+    $taxexempt = $params['clientsdetails']['taxexempt'];
+    if ($taxexempt) {
+		$tax1_rate = 0;
+		$tax2_rate = 0;
+    } else {
+		$tax1_rate = $tax1['rate'];
+		$tax2_rate = $tax2['rate'];
+	}
+
+    $whmcsClientCurrency = getCurrency($params['clientsdetails']['userid']);
     return array('minamount' => $minamount,
                  'maxamount' => $maxamount,
-                 'summary' => $summary,
-                 'last_usage_price' => $last_usage_price,
-                 'currency' => getCurrency($params['clientsdetails']['userid']));
+                 'tax1_rate' => $tax1_rate,
+				 'tax2_rate' => $tax2_rate,
+                 'currency' => $whmcsClientCurrency);
 }
 
 

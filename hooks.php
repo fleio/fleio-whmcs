@@ -245,7 +245,6 @@ function fleio_client_edit($vars) {
     } catch (Exception $e) {
         return;
     }
-
     // if this client has no OpenStack products, return
     if (!$product) { return; }
     else {
