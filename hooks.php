@@ -172,6 +172,8 @@ function openstack_change_funds($invoiceid, $substract=False) {
            continue;
         }
 		if ($item->type == 'PromoHosting') {
+            # NOTE(tomo): Do nothing with $promo_by_service. Just don't add it
+            #             to the final amount to avoid incorrect credit addition in Fleio
             if (isset($promo_by_service[$item->relid])) {
 		        $promo_by_service[$item->relid] += $item->amount;
             } else {
