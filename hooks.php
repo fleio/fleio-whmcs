@@ -165,15 +165,24 @@ function openstack_change_funds($invoiceid, $substract=False) {
         $balance = false;
     }  
     $cost_by_service = array();
+    $promo_by_service = array();
     foreach($items as $item) {
         # NOTE(tomo): Check if relid is set and not an empty string
         if (($item->relid == '') || !isset($item->relid)) {
            continue;
         }
-        if (isset($cost_by_service[$item->relid])) {
-            $cost_by_service[$item->relid] += $item->amount;
+		if ($item->type == 'PromoHosting') {
+            if (isset($promo_by_service[$item->relid])) {
+		        $promo_by_service[$item->relid] += $item->amount;
+            } else {
+                $promo_by_service[$item->relid] = $item->amount;
+            }
         } else {
-            $cost_by_service[$item->relid] = $item->amount;
+            if (isset($cost_by_service[$item->relid])) {
+                $cost_by_service[$item->relid] += $item->amount;
+            } else {
+                $cost_by_service[$item->relid] = $item->amount;
+            }
         }
     }
 
@@ -201,9 +210,9 @@ function openstack_change_funds($invoiceid, $substract=False) {
             }
             $fl = Fleio::fromServiceId($item->relid);
             if ($substract) {
-            	$msg_format = "Removing Fleio credit for WHMCS User ID: %s with %.02f %s (%.02f %s from Invoice ID: %s)";
+                $msg_format = "Fleio: removing credit for WHMCS User ID: %s with %.02f %s (%.02f %s from Invoice ID: %s)";
             } else {
-            	$msg_format = "Adding Fleio credit for WHMCS User ID: %s with %.02f %s (%.02f %s from Invoice ID: %s)";
+                $msg_format = "Fleio: adding credit for WHMCS User ID: %s with %.02f %s (%.02f %s from Invoice ID: %s)";
             }
             $msg = sprintf($msg_format, $item->userid, $amount, $defaultCurrency["code"], $clientAmount, $clientCurrency["code"], $invoiceid);
             logActivity($msg);

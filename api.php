@@ -81,7 +81,7 @@ class Fleio {
 
         $client = array('first_name' => $this->clientsdetails->firstname,
                         'last_name' => $this->clientsdetails->lastname,
-                        'company' => $this->clientsdetails->company,
+                        'company' => $this->clientsdetails->companyname,
                         'address1' => $this->clientsdetails->address1,
                         'address2' => $this->clientsdetails->address2,
                         'city' => $this->clientsdetails->city,
@@ -176,9 +176,8 @@ class Fleio {
 
     public function terminateOpenstack() {
         $fleio_client_id = $this->getClientId();
-        $url = '/clients/' . $fleio_client_id . '/terminate';
-        $params = array('delete_cloud_resources' => 'true');
-        return $this->flApi->post($url, $params);
+        $url = '/clients/' . $fleio_client_id;
+        return $this->flApi->delete($url);
     }
 
     public function addCredit($amount, $currencyCode, $currencyRate, $clientAmount, $clientCurrency, $invoiceId='') {
