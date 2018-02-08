@@ -23,7 +23,7 @@
                             </span>
                         </div>
 						{if $tax1_rate}
-						<span>Enter amount including {$tax1_rate}% VAT</span>
+						<span>{$tax1_rate}% VAT will be added to the amount you fill in.</span>
 						{/if}
                     </form>
                 </div>
