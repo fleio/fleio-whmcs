@@ -220,11 +220,8 @@ function openstack_change_funds($invoiceid, $substract=False) {
             logActivity($msg);
             # TODO(tomo): We use the userid which can be a contact ?
             try {
-                if ($substract) {
-                    $response = $fl->withdrawCredit($amount, $defaultCurrency["code"], $clientCurrency["rate"], $clientAmount, $clientCurrency["code"], $invoiceid);
-                } else {
-                	$response = $fl->addCredit($amount, $defaultCurrency["code"], $clientCurrency["rate"], $clientAmount, $clientCurrency["code"], $invoiceid);
-                }
+                $addCredit = (!$subtract);  // Add credit or subtract, boolean
+                $response = $fl->clientChangeCredit($addCredit, $amount, $defaultCurrency["code"], $clientCurrency["rate"], $clientAmount, $clientCurrency["code"], $invoiceid);
             } catch (FlApiException $e) {
                 logActivity("Unable to update the client credit in Fleio: " . $e->getMessage()); 
                 return;

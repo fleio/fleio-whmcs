@@ -180,38 +180,28 @@ class Fleio {
         return $this->flApi->delete($url);
     }
 
-    public function addCredit($amount, $currencyCode, $currencyRate, $clientAmount, $clientCurrency, $invoiceId='') {
+    public function clientChangeCredit($addCredit, $amount, $currencyCode, $currencyRate, $clientAmount, $clientCurrency, $invoiceId='') {
+        // originally this would have been: exchange_rate => $currencyrate; source_amount => $clientAmount; source_currency => $clientCurrency
+        // but Fleio may not have all the currencies from WHMCS. Also, Fleio does not do the actual exchange either;  
     	try {
     	     $fleio_client_id = $this->getClientId();
-    	     $url = '/clients/' . $fleio_client_id . '/add_credit';
+    	     $url = '/clients/' . $fleio_client_id . '/change_credit';
     	     $params = array('amount' => $amount,
     	                     'currency' => $currencyCode,
-    	                     'rate' => $currencyRate,
-    	                     'original_amount' => $clientAmount,
-    	                     'original_currency' => $clientCurrency);        
+    	                     'exchange_rate' => 1,
+    	                     'source_amount' => $amount,
+    	                     'source_currency' => $currencyCode,
+                             'add_credit' => $addCredit);
     	     return $this->flApi->post($url, $params); 
    	        } catch (Exception $e) {
-   	           logActivity('Fleio unable to add credit in Fleio for User ID: ' . $this->clientsdetails->userid . ' with ' . (string)$clientAmount);
+               if ($addCredit) {
+   	               logActivity('Fleio unable to add credit in Fleio for User ID: ' . $this->clientsdetails->userid . ' with ' . (string)$clientAmount);
+               } else {
+                   logActivity('Fleio unable to withdraw credit from FLeio for User ID: ' . $this->clientsdetails->userid . ' with ' . (string)$clientAmount);
+               }
    	           throw $e; 
    	        }
     }
-
-    public function withdrawCredit($amount, $currencyCode, $currencyRate, $clientAmount, $clientCurrency, $invoiceId='') {
-       	try {
-             $fleio_client_id = $this->getClientId();
-        	 $url = '/clients/' . $fleio_client_id . '/withdraw_credit';
-        	 $params = array('amount' => $amount,
-        	                 'currency' => $currencyCode,
-        	                 'rate' => $currencyRate,
-        	                 'original_amount' => $clientAmount,
-        	                 'original_currency' => $clientCurrency);        
-        	 return $this->flApi->post($url, $params); 
-       	    } catch (Exception $e) {
-       	       logActivity('Fleio unable to withdraw credit from FLeio for User ID: ' . $this->clientsdetails->userid . ' with ' . (string)$clientAmount);
-       	       throw $e; 
-       	    }
-    }
-    
 }
 
 
