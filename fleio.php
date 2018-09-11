@@ -311,10 +311,11 @@ function actionCreateInvoice($params, $request) {
     }
  
     $service = FleioUtils::getServiceById($params['serviceid']);
+    $add_credit_msg = isset($_LANG['fleioaddcredit']) ? $_LANG['fleioaddcredit'] : 'Add credit for';
     $clientsdetails = $params['clientsdetails'];
     $values["userid"] = $clientsdetails['userid'];
     $values["sendinvoice"] = true;
-    $values["itemdescription1"] = $service->name;
+    $values["itemdescription1"] = $add_credit_msg.' '.$service->name;
     $values["itemamount1"] = $amount;
     $values["itemtaxed1"] = true;
 
