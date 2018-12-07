@@ -21,7 +21,7 @@ Installation
     and add it to the WHMCS module in module settings
 6. Set the frontend public urls for user and admin
 7. Set the backend public url (eg: http://server_hostname/staffapi)
-8. Set the Maximum and Minimum ammounts (these are used to limit the amount a user can pay for a service)
+8. Set the Maximum and Minimum amounts (these are used to limit the amount a user can pay for a service)
 9. Make sure that WHMCS and Fleio have the same currencies
 10. In case a Configuration name and Group name is set in WHMCS Module Settings, make sure Fleio has the same Configuration and Client Group names.
     
@@ -43,4 +43,10 @@ Additional notes
 
 Any WHMCS automated billing will not work as expected and is not recommended.
 Instead you should use the Fleio billing system to calculate usage for clients and to require them to pay invoices or add credit.
-To achive this, you can set the product as free or set a one time payment requirement in WHMCS.
+To achieve this, you can set the product as free or set a one time payment requirement in WHMCS.
+
+
+License information
+===================
+
+fleio-whmcs is licensed under BSD License. See the "LICENSE" file for more information.
