@@ -135,7 +135,7 @@ function fleio_login($params) {
     try {
         $url = $fl->getSSOUrl();
         header("Location: " . $url);
-        return "success";
+        exit;
     } catch (FlApiException $e) {
         logActivity('Fleio SSO login error: ' . $e->getMessage());
         return "Unable to retrieve a SSO session";
