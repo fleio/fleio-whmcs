@@ -220,7 +220,7 @@ class FlApi {
         $this->HEADERS[] = 'Authorization: Token ' . $token;    
     }
 
-    public function post( $url, $params ) {
+    public function post( $url, $params = NULL) {
         $ch = curl_init();
         if (is_array($params)) {
             $json_params = json_encode($params);
