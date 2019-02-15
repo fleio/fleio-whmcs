@@ -18,6 +18,79 @@ add_hook("InvoiceCreation", 99, "fleio_update_invoice_hook");
 //add_hook("UpdateInvoiceTotal", 99, "fleio_test");
 //add_hook("DailyCronJob", 99, "fleio_cronjob"); // NOTE(tomo): Automatically creates invoices in WHMCS for clients
 add_hook("ClientEdit", 99, "fleio_client_edit");
+add_hook("DailyCronJob", 99, "fleio_PostCronjob");
+
+function fleio_PostCronjob() {
+    // Retrieve a list of all Fleio Clients that have external billing set and have reached their credit limit or have 
+    // unsettled billing histories
+    $fleioServers = FleioUtils::getFleioProducts();  // get all WHMCS products associated with the Fleio module
+    foreach($fleioServers as $server) {
+      $invoiceWithAgreement = $server->configoption11 == 'on' ? True : False; // invoice clients with billing agreement
+      $invoiceWithoutAgreement = $server->configoption10 == 'on' ? True : False;  // invoice clients without billing agreement
+      if ($invoiceWithAgreement && $invoiceWithoutAgreement) {
+        logActivity('Fleio: Looking at clients with and without a billing agreement');
+      };
+      $flApi = new FlApi($server->configoption4, $server->configoption1);
+      FleioUtils::updateClientsBillingAgreement($flApi);
+      logActivity('Fleio: retrieving all overdue clients');
+      $url = "/clients/over_credit_limit";
+      $urlParams = array(
+        "has_external_billing" => 'True', // only clients with external billing set and credit less than 0
+        "main_credit_max" => 0
+      );
+      if ($invoiceWithAgreement && !$invoiceWithoutAgreement) {
+        // Filter only Clients with billing agreement
+        $urlParams['has_billing_agreement'] = 'True';
+        logActivity('Fleio: Looking at clients with billing agreements only');
+      };
+      if (!$invoiceWithAgreement && $invoiceWithoutAgreement) {
+        // Filter only Clients without billing agreement
+        $urlParams['has_billing_agreement'] = 'False';
+        logActivity('Fleio: Looking at clients without a billing agreement only');
+      };
+      try {
+        $clientsOverLimit = $flApi->get($url, $urlParams);
+        foreach($clientsOverLimit as $clientOl) {
+            try {
+                $clientFromUUID = FleioUtils::getUUIDClient($clientOl['external_billing_id']);
+                if ($clientFromUUID != NULL) {
+                    $alreadyInvoicedAndUnpaid = FleioUtils::getFleioProductsInvoicedAmount($clientFromUUID->id);
+                    $daysSinceLastInvoice = $alreadyInvoicedAndUnpaid['days_since_last_invoice'];
+                    $daysSinceLastInvoice = $daysSinceLastInvoice == NULL ? 999999 : $daysSinceLastInvoice; // set a large enough value in case of NULL
+                    $amountInvoiced = $alreadyInvoicedAndUnpaid["amount"];
+                    $amountUsedAndUninvoiced = 0 - $clientOl['credit_amount'] - $amountInvoiced;
+                    // Check unsettled Fleio billing histories
+                    if (!($daysSinceLastInvoice > 7)) {
+                        // If a service was already invoiced a few days ago, ignore;
+                        continue;
+                    }
+                    if ($amountUsedAndUninvoiced > 0 && sizeof($clientOl['unsettled_periods']) > 0) {
+                        // Invoice if client is not over limit but has reached his billing cycle
+                        logActivity('Issuing invoice for User ID: '. $clientFromUUID->id. ' due to end of cycle for '. $amountUsedAndUninvoiced . ' ' . $alreadyInvoiced["currency"]["code"]);
+                        FleioUtils::createOverdueClientInvoice($clientFromUUID->id, $amountUsedAndUninvoiced);
+                        $amountInvoiced += $amountUsedAndUninvoiced;
+                        $amountUsedAndUninvoiced = 0;
+                        continue;
+                    }
+                    if ($amountUsedAndUninvoiced > 0 && $amountUsedAndUninvoiced >= (0 - $clientOl['effective_credit_limit'])) {
+                        // Invoice if client is over limit and no unpaid invoice exists to cover it and no invoice was issued in the last few days
+                        logActivity('Issuing invoice for User ID: '. $clientFromUUID->id. ' over credit limit for '. $amountUsedAndUninvoiced . ' ' . $alreadyInvoiced["currency"]["code"]);
+                        FleioUtils::createOverdueClientInvoice($clientFromUUID->id, $amountUsedAndUninvoiced);
+                    } 
+                } else {
+                    logActivity('Fleio: unable to retrieve WHMCS client with UUID: '. $clientFromUUID->id);
+                }
+	     } catch ( Exception $e ) {
+		logActivity($e->getMessage());
+                continue;
+	     }
+           }
+      } catch ( Exception $e ) {
+        logActivity('Fleio: unable to retrieve over credit clients. ' . $e->getMessage());
+        continue;
+      }
+   }
+}
 
 function fleio_cronjob($vars) {
     /*
@@ -36,32 +109,32 @@ function fleio_cronjob($vars) {
         }
         logActivity('Fleio: got ' . count($bhistories) . ' client logs from Fleio Product ID: ' . $server->id);
         foreach($bhistories as $bhist) {
-		  $client_uuid = $bhist['client']['external_billing_id'];
+      $client_uuid = $bhist['client']['external_billing_id'];
           if (!$client_uuid) { continue; }
-		  $price = $bhist['price']; # FIXME(tomo): Convert to client's currency (make sure it's the same)
-		  try {
-			  $client = Capsule::table('tblclients')->where('uuid', '=', $client_uuid)->first();
-		  } catch (Exception $e) {
-			logActivity('Fleio: unable to retrieve client with uuid ' . $client_uuid);
-			continue;
-		  }
+      $price = $bhist['price']; # FIXME(tomo): Convert to client's currency (make sure it's the same)
+      try {
+        $client = Capsule::table('tblclients')->where('uuid', '=', $client_uuid)->first();
+      } catch (Exception $e) {
+      logActivity('Fleio: unable to retrieve client with uuid ' . $client_uuid);
+      continue;
+      }
           if (!$client) { 
             logActivity('Fleio: no user with uuid: ' . $client_uuid);
-          	continue; 
+            continue; 
           }
-		  $product = FleioUtils::getClientProduct($client->id);
+      $product = FleioUtils::getClientProduct($client->id);
           if (!$product) { 
             logActivity('Fleio: no active products for User ID: ' . $client->id); 
-			continue; 
-		  }
-		  # Create the invoice
-		  $postData = [
-			  'userid' => $client->id,
-			  'sendinvoice' => '1',
-			  'itemdescription1' => $product->name,
-			  'itemamount1' => $price,
-			  'itemtaxed1' => true];
-		  $invoice_id = FleioUtils::createFleioInvoice($product->id, $postData);
+      continue; 
+      }
+      # Create the invoice
+      $postData = [
+        'userid' => $client->id,
+        'sendinvoice' => '1',
+        'itemdescription1' => $product->name,
+        'itemamount1' => $price,
+        'itemtaxed1' => true];
+      $invoice_id = FleioUtils::createFleioInvoice($product->id, $postData);
           logActivity('Fleio: Invoice ID: ' . $invoice_id . ' created for Service ID: ' . $product->id);
         }
     }
@@ -69,8 +142,8 @@ function fleio_cronjob($vars) {
 
 function fleio_update_invoice_hook($vars) {
     if ($vars['source'] != 'autogen') {
-	  # created manually in admin or client area or through localAPI (source = 'api'), skip ?
-	  return;
+    # created manually in admin or client area or through localAPI (source = 'api'), skip ?
+    return;
     }
     $invoice = Capsule::table('tblinvoices')->where('id', '=', $vars["invoiceid"])->first();
     # NOTE(tomo): Select only Hosting type items. Otherwise we will end up with domains and other types being paid for.
@@ -171,11 +244,11 @@ function openstack_change_funds($invoiceid, $substract=False) {
         if (($item->relid == '') || !isset($item->relid)) {
            continue;
         }
-		if ($item->type == 'PromoHosting') {
+    if ($item->type == 'PromoHosting') {
             # NOTE(tomo): Do nothing with $promo_by_service. Just don't add it
             #             to the final amount to avoid incorrect credit addition in Fleio
             if (isset($promo_by_service[$item->relid])) {
-		        $promo_by_service[$item->relid] += $item->amount;
+            $promo_by_service[$item->relid] += $item->amount;
             } else {
                 $promo_by_service[$item->relid] = $item->amount;
             }

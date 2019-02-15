@@ -26,6 +26,8 @@ class Fleio {
         $server->frontend_url = $params['configoption2'];
         $server->token = $params['configoption1'];
         $server->userPrefix = !empty(trim($params['configoption9'])) ? trim($params['configoption9']) : 'whmcs';
+	$server->invoiceClientsWithoutAgreement = trim($params['configoption10']) == 'on' ? True : False;
+        $server->invoiceClientsWithAgreement = trim($params['configoption11']) == 'on' ? True : False;
         $server->ClientConfiguration = !empty(trim($params['configoption8'])) ? trim($params['configoption8']) : NULL;
         $clientsdetails = (object) $params['clientsdetails'];
         return new self($server, $clientsdetails);
@@ -40,13 +42,15 @@ class Fleio {
         $clientsdetails = Capsule::table('tblclients')->join('tblhosting', 'tblhosting.userid', '=', 'tblclients.id')->where('tblhosting.id', '=', $prodid)->first();
         $dbserver = Capsule::table('tblhosting')
             ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
-            ->select('tblproducts.configoption1', 'tblproducts.configoption2', 'tblproducts.configoption4', 'tblproducts.configoption8', 'tblproducts.configoption9')
+            ->select('tblproducts.configoption1', 'tblproducts.configoption2', 'tblproducts.configoption4', 'tblproducts.configoption8', 'tblproducts.configoption9', 'tblproducts.configoption10', 'tblproducts.configoption11')
             ->where('tblhosting.id', '=', $prodid)->first();
         $server = new stdClass;
         $server->url = $dbserver->configoption4;
         $server->frontend_url = $dbserver->configoption2;
         $server->token = $dbserver->configoption1;
-        $server->userPrefix = !empty(trim($dbserver->configoption9)) ? trim($dbserver->configoption9) : 'whmcs';
+	$server->userPrefix = !empty(trim($dbserver->configoption9)) ? trim($dbserver->configoption9) : 'whmcs';
+	$server->invoiceClientsWithoutAgreement = trim($dbserver->configoption10) == 'on' ? True : False;
+        $server->invoiceClientsWithAgreement = trim($dbserver->configoption11) == 'on' ? True : False;
         $server->ClientConfiguration = !empty(trim($dbserver->configoption8)) ? trim($dbserver->configoption8) : NULL;
         return new self($server, $clientsdetails);
     }
@@ -202,6 +206,7 @@ class Fleio {
    	           throw $e; 
    	        }
     }
+
 }
 
 

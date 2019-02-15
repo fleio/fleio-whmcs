@@ -76,7 +76,7 @@ function fleio_ConfigOptions() {
         "FriendlyName" => "Fleio Configuration Name",
         "Type" => "text",
 		"Size" => "32",
-        "Description" => "Configuration name to set for Fleio clients",
+        "Description" => "Fleio configuration for new clients",
         "Default" => ""
     ),
     "userprefix" => array (
@@ -85,6 +85,16 @@ function fleio_ConfigOptions() {
         "Size" => "12",
         "Description" => "Leave blank for 'whmcs'",
         "Default" => "whmcs",
+    ),
+    "issueinvoice" => array (
+        "FriendlyName" => "Invoice clients without billing agreement",
+	"Type" => "yesno",
+	"Description" => "Issue invoice at the end of billing cycle for clients without billing agreement",
+    ),
+    "issueInvWAgr" => array (
+        "FriendlyName" => "Invoice clients with billing agreement",
+	"Type" => "yesno",
+	"Description" => "Issue invoice at the end of billing cycle for clients with billing agreement",
     ),
     );
     return $configarray;
