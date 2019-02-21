@@ -2,6 +2,8 @@
     .panel-height-150 {
         height:150px;
     }
+    .flnowraptext { white-space: nowrap;};
+    .fldisplayblock { display: block};
 </style>
 
 <div class="row">
@@ -23,8 +25,14 @@
                             </span>
                         </div>
 						{if $tax1_rate}
-						<span>{$tax1_rate}% VAT will be added to the amount you fill in.</span>
+						<span class="flnowraptext fldisplayblock">{$tax1_rate}% VAT will be added to the amount you fill in.</span>
 						{/if}
+                        {if $uptodateCredit}
+                        <span class="flnowraptext fldisplayblock">Current cloud credit: {$uptodateCredit}</span>
+                        {/if}
+                        {if $outofcreditDatetime}
+                        <span class="flnowraptext fldisplayblock text-danger">Your account is out of credit since: {$outofcreditDatetime|date_format}</span>
+                        {/if}
                     </form>
                 </div>
             </div>

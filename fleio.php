@@ -276,12 +276,27 @@ function actionOverview($params, $request) {
 		$tax2_rate = $tax2['rate'];
 	}
 
+    $uptodateCredit = NULL;
+    $outofcreditDatetime = NULL;
+    $fleioClientCurrency = NULL;
     $whmcsClientCurrency = getCurrency($params['clientsdetails']['userid']);
+    if (is_array($client) && array_key_exists('uptodate_credit', $client) && array_key_exists('outofcredit_datetime', $client)) {
+        $uptodateCredit = $client['uptodate_credit'];
+        $outofcreditDatetime = $client['outofcredit_datetime'];
+        $fleioClientCurrency = getCurrency($client['currency']);
+        try {
+          $uptodateCreditFormatted = formatCurrency($uptodateCredit, $fleioClientCurrency['id']);
+        } catch (Exception $e) { 
+          $uptodateCreditFormatted = '' . $uptodateCredit; 
+        }
+    }
     return array('minamount' => $minamount,
                  'maxamount' => $maxamount,
                  'tax1_rate' => $tax1_rate,
 				 'tax2_rate' => $tax2_rate,
-                 'currency' => $whmcsClientCurrency);
+                 'currency' => $whmcsClientCurrency,
+                 'uptodateCredit' => $uptodateCreditFormatted,
+                 'outofcreditDatetime' => $outofcreditDatetime);
 }
 
 

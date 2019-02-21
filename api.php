@@ -26,7 +26,7 @@ class Fleio {
         $server->frontend_url = $params['configoption2'];
         $server->token = $params['configoption1'];
         $server->userPrefix = !empty(trim($params['configoption9'])) ? trim($params['configoption9']) : 'whmcs';
-	$server->invoiceClientsWithoutAgreement = trim($params['configoption10']) == 'on' ? True : False;
+        $server->invoiceClientsWithoutAgreement = trim($params['configoption10']) == 'on' ? True : False;
         $server->invoiceClientsWithAgreement = trim($params['configoption11']) == 'on' ? True : False;
         $server->ClientConfiguration = !empty(trim($params['configoption8'])) ? trim($params['configoption8']) : NULL;
         $clientsdetails = (object) $params['clientsdetails'];
@@ -48,8 +48,8 @@ class Fleio {
         $server->url = $dbserver->configoption4;
         $server->frontend_url = $dbserver->configoption2;
         $server->token = $dbserver->configoption1;
-	$server->userPrefix = !empty(trim($dbserver->configoption9)) ? trim($dbserver->configoption9) : 'whmcs';
-	$server->invoiceClientsWithoutAgreement = trim($dbserver->configoption10) == 'on' ? True : False;
+        $server->userPrefix = !empty(trim($dbserver->configoption9)) ? trim($dbserver->configoption9) : 'whmcs';
+        $server->invoiceClientsWithoutAgreement = trim($dbserver->configoption10) == 'on' ? True : False;
         $server->invoiceClientsWithAgreement = trim($dbserver->configoption11) == 'on' ? True : False;
         $server->ClientConfiguration = !empty(trim($dbserver->configoption8)) ? trim($dbserver->configoption8) : NULL;
         return new self($server, $clientsdetails);
@@ -251,6 +251,7 @@ class FlApi {
 
     public function get( $url, $params ) {
         $ch = curl_init();
+        $this->TEMP_HEADERS = array();
         if (is_array($params)) {
             $getfields = http_build_query($params);
             str_replace('.', '%2E', $getfields);
@@ -312,6 +313,9 @@ class FlApi {
         curl_setopt($ch, CURLOPT_AUTOREFERER, true);
         curl_setopt($ch, CURLOPT_POSTREDIR, 3);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // Set the connection timeout to 10 seconds.
+        if ($method == 'GET') {
+           curl_setopt($ch, CURLOPT_HTTPGET, 1); 
+        }
         $headers = array();
         foreach ($this->HEADERS as $h) {
             array_push($headers, $h);

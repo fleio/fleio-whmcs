@@ -136,7 +136,7 @@ class FleioUtils {
 
     public static function createOverdueClientInvoice($clientId, $amount, $type='Hosting') {
     // Calculate date and due date of invoice
-      $dueDays = 1;
+      $dueDays = 0;
       $today = date('Y-m-d');
       $dueDate = new DateTime($today);
       $dueDate->modify('+' . $dueDays . ' day');
@@ -155,7 +155,7 @@ class FleioUtils {
       $productId = $fleioProduct->id;
       $data = [
         "date" => $today,
-        "duedate" => $dueDate,
+        "duedate" => $dueDate->format('Y-m-d'),
         'userid' => $clientId,
         'sendinvoice' => '1',
         'itemdescription1' => 'Cloud services',
