@@ -37,6 +37,38 @@ The WHMCS module supports the following:
 * auto credit adjustment for paid invoices
 * ability to create new invoices for Fleio credit
 * auto update of Fleio client details if WHMCS client is updated
+* auto update of Fleio client when he adds a billing agreement or CC in WHMCS
+* auto issue of invoices for Fleio clients passing a certain amount in usage before the end of a month
+* auto issue of invoices for Fleio clients at the end of a month
+* auto charge attempt after an invoice is issued for clients with a billing agreement or CC on file
+
+How does the module issue new invoices
+======================================
+
+We will assume a credit limit exists in Fleio:
+
+* for clients without a billing agreement or CC on file of: -10 USD
+* for clients with a billing agreement or CC on file of: -20 USD
+
+If *Invoice clients without billing agreement* is checked in the Fleio Module Settings in WHMCS, all clients that do not have a billing agreement or CC on file in WHMCS will be issued invoices as follows:
+
+* when they reach a usage of over 10 USD at any time during a month
+* when a month passes, for the amount used if it's lower than the credit limit
+
+The same as the above applies for clients with a billing agreement of CC on file when "Invoice clients with billing agreement" is checked with the usage being over 20 USD.
+If the option *Attempt a charge immediately* is also checked, then a charge is attempted automatically for these clients, for the invoices issued.
+
+When a client passes his credit limit the second time during a month, a second invoice will be issued and so on.
+
+On all cases, two invoices will never be issued on the same day for the same product.
+There is a delay of 1 day for when a second invoice can be automatically issued.
+The payment method set for invoices is the one set on the WHMCS service, not the Client. 
+Do note however that if you set a new payment method on the WHMCS Client profile tab, that payment method will be used for all unpaid invoices and 
+auto charging may fail if the new gateway does not support this.
+If auto generated invoices are deleted or marked canceled, new invoices will be issued.
+
+Clients usage is checked every time the WHMCS cron runs. The default recommended period is 5 minutes.
+
 
 Additional notes
 ================
