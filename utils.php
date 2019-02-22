@@ -52,21 +52,28 @@ class FleioUtils {
       return $prod;
     }
 
-    public static function getClientProduct($clientId, $status='Active') {
-	  # Get the Fleio product for a client. A client has only one Fleio product.
-	  try {
-		  $prod = Capsule::table('tblhosting AS th')
-      					 ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
-						 ->where('th.userid', '=', $clientId)
-				    	 ->where('th.domainstatus', '=', $status)
-						 ->where('tp.servertype', '=', 'fleio')
-						 ->select('th.*', 'tp.name', 'tp.description', 'tp.servergroup', 'tp.tax', 'tp.configoption8 AS configuration')
-    					 ->first();
-	  } catch (Exception $e) {
-		  return NULL;
-	  }
-	  return $prod;
-	}
+    public static function getClientProduct($clientId, $packageId=NULL, $status='Active') {
+	  # Get the Fleio service for a client. A client has only one Fleio product.
+      try {
+         if (!is_null($packageId)) {
+             $prod = Capsule::table('tblhosting AS th')
+                             ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
+                             ->where('th.userid', '=', $clientId)
+                             ->where('th.domainstatus', '=', $status)
+                             ->where('tp.servertype', '=', 'fleio')->first();
+          } else {
+            $prod = Capsule::table('tblhosting AS th')
+                            ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
+                            ->where('th.userid', '=', $clientId)
+                            ->where('th.domainstatus', '=', $status)
+                            ->where('tp.id', '=', $packageId)
+                            ->where('tp.servertype', '=', 'fleio')->first(); 
+          }
+      } catch (Exception $e) {
+        return NULL;
+      }
+      return $prod;
+    }
 
     public static function getUUIDClient($clientUUID) {
 	    // Get the Fleio product for a WHMCS client specified by Client UUID
@@ -134,25 +141,23 @@ class FleioUtils {
       }
     }
 
-    public static function createOverdueClientInvoice($clientId, $amount, $type='Hosting') {
-    // Calculate date and due date of invoice
+    public static function createOverdueClientInvoice($clientId, $amount, $fleioServiceId, $invoicePaymentMethod=NULL, $type='Hosting') {
+      // Calculate date and due date of invoice
       $dueDays = 0;
       $today = date('Y-m-d');
       $dueDate = new DateTime($today);
       $dueDate->modify('+' . $dueDays . ' day');
       // Get an admin username, required to use local API 
       try {
-	  $adminUsername = self::getWHMCSAdmin();
+	    $adminUsername = self::getWHMCSAdmin();
       } catch (Exception $e) {
         logActivity('Fleio: ' . $e->getMessage());
         throw new Exception('Unable to create invoice'); // We do not throw the original message since it may contain sensitive data
       }
       // Get the client Fleio product, to create an invoice for
-      $fleioProduct = self::getClientProduct($clientId);
-      if (!$fleioProduct) {
+      if (!$fleioServiceId) {
         throw new Exception('Fleio: unable to issue invoice for Client ID: ' . $clientId . ' since no OpenStack products found.');
       }
-      $productId = $fleioProduct->id;
       $data = [
         "date" => $today,
         "duedate" => $dueDate->format('Y-m-d'),
@@ -161,22 +166,25 @@ class FleioUtils {
         'itemdescription1' => 'Cloud services',
         'itemamount1' => $amount,
         'itemtaxed1' => true];
+      if (!is_null($invoicePaymentMethod)) {
+        $data['paymentmethod'] = $invoicePaymentMethod;
+      }
       $result = localAPI('CreateInvoice', $data, $adminUsername);
       if ($result["result"] == "success") {
         $invoice_id = $result['invoiceid'];
         Capsule::table('tblinvoiceitems')
                ->where('invoiceid', (string) $invoice_id)
-               ->update(array("type"=>$type, "relid"=>$productId));
+               ->update(array("type"=>$type, "relid"=>$fleioServiceId));
         return $invoice_id;
       } else {
         throw new Exception($result["message"]);
       }
     }
 
-    public static function getFleioProductsInvoicedAmount($clientId) {
+    public static function getFleioProductsInvoicedAmount($clientId, $fleioPackageId) {
       // Get the amount already invoiced and unpaid for Fleio active products related to this client
       // Return an array of: {"amount": .. "currency": .. "product": .. , "invoiced_since_days": ..}
-      $fleioProduct = self::getClientProduct($clientId);
+      $fleioProduct = self::getClientProduct($clientId, $fleioPackageId);
       $clientCurrency = getCurrency($clientId);
       if (!$fleioProduct) {
         throw new Exception('Fleio: unable to issue invoice for Client ID: ' . $clientId . ' since no OpenStack products found.');
@@ -233,5 +241,26 @@ class FleioUtils {
           }
         }
    }
+   public static function captureInvoicePayment($invoiceId) {
+        $data = array('invoiceid' => $invoiceId);
+        $result = localAPI('CapturePayment', $data);
+        if (is_array($result) && $result['result'] != 'success') {
+            $captureMessage = $result['message'];
+        } else {
+            $captureMessage = 'Captured successfully';
+        }
+        logActivity('Fleio: capture Invoice ID: '. $invoiceId .' '.$captureMessage);
+   }
+  public static function getClientPaymentMethod($clientId) {
+        try {
+            $pgw = Capsule::table('tblclient AS tc')
+                           ->join('tblpaymentgateways AS tgw', 'tc.gatewayid', '=', 'tgw.id')
+                           ->select('tgw.gateway')
+                           ->first();
+           return $pgw->gateway;
+        } catch (Exception $e) {
+           return NULL;
+        }
+  }
 }
 

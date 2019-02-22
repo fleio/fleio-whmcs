@@ -96,6 +96,11 @@ function fleio_ConfigOptions() {
 	"Type" => "yesno",
 	"Description" => "Issue invoice at the end of billing cycle for clients with billing agreement",
     ),
+    "chargeInvoiceRightAway" => array (
+        "FriendlyName" => "Attempt a charge immediately",
+    "Type" => "yesno",
+    "Description" => "Attempt charging of auto generated invoices when CC is on file immediately after the invoice was issued",
+    ),
     );
     return $configarray;
 }

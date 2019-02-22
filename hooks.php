@@ -28,6 +28,7 @@ function fleio_PostCronjob() {
     foreach($fleioServers as $server) {
       $invoiceWithAgreement = $server->configoption11 == 'on' ? true : false; // invoice clients with billing agreement
       $invoiceWithoutAgreement = $server->configoption10 == 'on' ? true : false;  // invoice clients without billing agreement
+      $capturePaymentImmediately = $server->configoption12 == 'on' ? true : false; // Attempt to capture payment immediately
       if ($invoiceWithAgreement && $invoiceWithoutAgreement) {
         logActivity('Fleio: Looking at clients with and without a billing agreement');
       };
@@ -57,30 +58,41 @@ function fleio_PostCronjob() {
             try {
                 $clientFromUUID = FleioUtils::getUUIDClient($clientOl['external_billing_id']);
                 if ($clientFromUUID != NULL) {
-                    $alreadyInvoicedAndUnpaid = FleioUtils::getFleioProductsInvoicedAmount($clientFromUUID->id);
+                    $clientHasBillingAgreement = !is_null($clientFromUUID->gatewayid) && !empty($clientFromUUID->gatewayid);
+                    $alreadyInvoicedAndUnpaid = FleioUtils::getFleioProductsInvoicedAmount($clientFromUUID->id, $server->id);
+                    $fleioWhmcsService = $alreadyInvoicedAndUnpaid['product'];
+                    $fleioWhmcsServiceId = $fleioWhmcsService->id;
                     $daysSinceLastInvoice = $alreadyInvoicedAndUnpaid['days_since_last_invoice'];
                     $daysSinceLastInvoice = $daysSinceLastInvoice == NULL ? 999999 : $daysSinceLastInvoice; // set a large enough value in case of NULL
                     $amountInvoiced = $alreadyInvoicedAndUnpaid["amount"];
                     $amountUsedAndUninvoiced = 0 - $clientOl['uptodate_credit'] - $amountInvoiced;
                     // Check unsettled Fleio billing histories
-                    if (!($daysSinceLastInvoice > 7)) {
-                        // If a service was already invoiced a few days ago, ignore;
-                        continue;
-                    }
-                    if ($amountUsedAndUninvoiced > 0 && sizeof($clientOl['unsettled_periods']) > 0) {
-                        // Invoice if client is not over limit but has reached his billing cycle
-                        FleioUtils::createOverdueClientInvoice($clientFromUUID->id, $amountUsedAndUninvoiced);
-                        logActivity('Fleio: issued invoice for User ID: '. $clientFromUUID->id. ' due to end of cycle for '. $amountUsedAndUninvoiced . ' ' . $alreadyInvoicedAndUnpaid["currency"]["code"]);
+                    if ($amountUsedAndUninvoiced > 0 && sizeof($clientOl['unsettled_periods']) > 0 && $daysSinceLastInvoice > 0) {
+                        // Invoice if client is not over limit but has reached his billing cycle and no invoice was issued in the previous day
+                        $invoicePaymentMethod = $fleioWhmcsService->paymentmethod;
+                        // Use the client payment method instead of the Service one
+                        // $invoicePaymentMethod = FleioUtils::getClientPaymentMethod($clientFromUUID->id);
+                        $invoiceId = FleioUtils::createOverdueClientInvoice($clientFromUUID->id, $amountUsedAndUninvoiced, $fleioWhmcsServiceId, $invoicePaymentMethod);
+                        logActivity('Fleio: issued Invoice ID: '. $invoiceId .' for User ID: '. $clientFromUUID->id. ' due to end of cycle for '. $amountUsedAndUninvoiced . ' ' . $alreadyInvoicedAndUnpaid["currency"]["code"]);
                         $amountInvoiced += $amountUsedAndUninvoiced;
                         $amountUsedAndUninvoiced = 0;
                         $numInvoicedClients += 1;
+                        if ($capturePaymentImmediately && $clientHasBillingAgreement) {
+                            FleioUtils::captureInvoicePayment($invoiceId);
+                        }
                         continue;
                     }
                     if ($amountUsedAndUninvoiced > 0 && $amountUsedAndUninvoiced >= (0 - $clientOl['effective_credit_limit'])) {
                         // Invoice if client is over limit and no unpaid invoice exists to cover it and no invoice was issued in the last few days
-                        logActivity('Fleio: issuing invoice for User ID: '. $clientFromUUID->id. ' for over credit limit of '. $amountUsedAndUninvoiced . ' ' . $alreadyInvoicedAndUnpaid["currency"]["code"]);
-                        FleioUtils::createOverdueClientInvoice($clientFromUUID->id, $amountUsedAndUninvoiced);
+                        $invoicePaymentMethod = $fleioWhmcsService->paymentmethod;
+                        // Use the Client payment method instead of the service one
+                        // $invoicePaymentMethod = FleioUtils::getClientPaymentMethod($clientFromUUID->id);
+                        $invoiceId = FleioUtils::createOverdueClientInvoice($clientFromUUID->id, $amountUsedAndUninvoiced, $fleioWhmcsServiceId, $invoicePaymentMethod);
+                        logActivity('Fleio: issued Invoice ID: '. $invoiceId .' for User ID: '. $clientFromUUID->id. ' for over credit limit of '. $amountUsedAndUninvoiced . ' ' . $alreadyInvoicedAndUnpaid["currency"]["code"]);
                         $numInvoicedClients += 1;
+                        if ($capturePaymentImmediately && $clientHasBillingAgreement) {
+                            FleioUtils::captureInvoicePayment($invoiceId);
+                        }
                     }
                 } else {
                     logActivity('Fleio: unable to retrieve WHMCS client with UUID: '. $clientOl['external_billing_id']);
@@ -88,7 +100,7 @@ function fleio_PostCronjob() {
 	       } catch ( Exception $e ) {
                 logActivity($e->getMessage());
                 continue;
-	       }
+           }
       }
     if ($numInvoicedClients > 0) {
         logActivity('Fleio: invoiced ' . $numInvoicedClients . ' overdue clients' );
@@ -107,7 +119,7 @@ function fleio_cronjob($vars) {
     Function that is executed each time the WHMCS daily cron runs.
     This should check all Fleio products and create invoices for them.
     */
-    logActivity('Fleio: daily cron start');
+    logActivity('Fleio: cron start');
     $fleioServers = FleioUtils::getFleioProducts();
     foreach($fleioServers as $server) {
         $flApi = new FlApi($server->configoption4, $server->configoption1);
@@ -117,35 +129,34 @@ function fleio_cronjob($vars) {
             logActivity('Fleio: unable to retrieve billing history. ' . $e->getMessage());
             continue;
         }
-        logActivity('Fleio: got ' . count($bhistories) . ' client logs from Fleio Product ID: ' . $server->id);
         foreach($bhistories as $bhist) {
-      $client_uuid = $bhist['client']['external_billing_id'];
-          if (!$client_uuid) { continue; }
-      $price = $bhist['price']; # FIXME(tomo): Convert to client's currency (make sure it's the same)
-      try {
-        $client = Capsule::table('tblclients')->where('uuid', '=', $client_uuid)->first();
-      } catch (Exception $e) {
-      logActivity('Fleio: unable to retrieve client with uuid ' . $client_uuid);
-      continue;
-      }
-          if (!$client) { 
-            logActivity('Fleio: no user with uuid: ' . $client_uuid);
-            continue; 
-          }
-      $product = FleioUtils::getClientProduct($client->id);
-          if (!$product) { 
-            logActivity('Fleio: no active products for User ID: ' . $client->id); 
-      continue; 
-      }
-      # Create the invoice
-      $postData = [
-        'userid' => $client->id,
-        'sendinvoice' => '1',
-        'itemdescription1' => $product->name,
-        'itemamount1' => $price,
-        'itemtaxed1' => true];
-      $invoice_id = FleioUtils::createFleioInvoice($product->id, $postData);
-          logActivity('Fleio: Invoice ID: ' . $invoice_id . ' created for Service ID: ' . $product->id);
+            $client_uuid = $bhist['client']['external_billing_id'];
+            if (!$client_uuid) { continue; }
+            $price = $bhist['price']; # FIXME(tomo): Convert to client's currency (make sure it's the same)
+            try {
+              $client = Capsule::table('tblclients')->where('uuid', '=', $client_uuid)->first();
+            } catch (Exception $e) {
+              logActivity('Fleio: unable to retrieve client with uuid ' . $client_uuid);
+              continue;
+            }
+            if (!$client) { 
+              logActivity('Fleio: no user with uuid: ' . $client_uuid);
+              continue; 
+            }
+            $product = FleioUtils::getClientProduct($client->id, $server->id);
+            if (!$product) { 
+              logActivity('Fleio: no active products for User ID: ' . $client->id); 
+              continue; 
+            }
+            # Create the invoice
+            $postData = [
+              'userid' => $client->id,
+              'sendinvoice' => '1',
+              'itemdescription1' => $product->name,
+              'itemamount1' => $price,
+              'itemtaxed1' => true];
+            $invoice_id = FleioUtils::createFleioInvoice($product->id, $postData);
+            logActivity('Fleio: Invoice ID: ' . $invoice_id . ' created for Service ID: ' . $product->id);
         }
     }
 }
