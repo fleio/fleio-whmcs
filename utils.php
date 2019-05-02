@@ -25,6 +25,18 @@ class FleioUtils {
       return ModuleQueue::add($serviceType, $serviceId, 'fleio', $action, $errmsg);    
     }
 
+    public static function daysDiff($stringDate) {
+        // Days diff between now and a date as strings: eg: '2019-02-14'
+        try {
+            $sndDate = date(strtotime($stringDate));
+            $datediff = time() - $sndDate;
+            return round($datediff / (60 * 60 * 24));
+        } catch (Exception $e) {
+            logActivity('Fleio: unable to convert dates!');
+            return NULL;
+        }
+    }
+
 	public static function getServiceById($serviceId) {
       # Return a service including the product name amd description and some settings
       try {
@@ -40,21 +52,36 @@ class FleioUtils {
       return $prod;
     }
 
-    public static function getClientProduct($clientId, $status='Active') {
-	  # Get the Fleio product for a client. A client has only one Fleio product.
-	  try {
-		  $prod = Capsule::table('tblhosting AS th')
-					  ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
-					  ->where('th.userid', '=', $clientId)
-					  ->where('th.domainstatus', '=', $status)
-					  ->where('tp.servertype', '=', 'fleio')
-                      ->select('th.*', 'tp.name', 'tp.description', 'tp.servergroup', 'tp.tax', 'tp.configoption8 AS configuration')
-					  ->first();
-	  } catch (Exception $e) {
-		  return NULL;
-	  }
-	  return $prod;
-	}
+    public static function getClientProduct($clientId, $packageId=NULL, $status='Active') {
+	  # Get the Fleio service for a client. A client has only one Fleio product.
+      try {
+         if (!is_null($packageId)) {
+             $prod = Capsule::table('tblhosting AS th')
+                             ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
+                             ->where('th.userid', '=', $clientId)
+                             ->where('th.domainstatus', '=', $status)
+                             ->where('tp.servertype', '=', 'fleio')->first();
+          } else {
+            $prod = Capsule::table('tblhosting AS th')
+                            ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
+                            ->where('th.userid', '=', $clientId)
+                            ->where('th.domainstatus', '=', $status)
+                            ->where('tp.id', '=', $packageId)
+                            ->where('tp.servertype', '=', 'fleio')->first(); 
+          }
+      } catch (Exception $e) {
+        return NULL;
+      }
+      return $prod;
+    }
+
+    public static function getUUIDClient($clientUUID) {
+	    // Get the Fleio product for a WHMCS client specified by Client UUID
+        return Capsule::table('tblclients AS tc')
+                          ->where('tc.uuid', '=', $clientUUID)
+                          ->select('tc.*')
+                          ->first();
+    }
 
     public static function getFleioProducts() {
       # Retrieve all the products of type Fleio
@@ -102,8 +129,7 @@ class FleioUtils {
           logActivity('Fleio: ' . $e->getMessage());
           throw new Exception('Unable to create invoice'); // We do not throw the original message since it may contain sensitive data
       }
-
-	  $result = localAPI('CreateInvoice', $data, $adminUsername);
+      $result = localAPI('CreateInvoice', $data, $adminUsername);
       if ($result["result"] == "success") {
 	    $invoice_id = $result['invoiceid'];
 	    Capsule::table('tblinvoiceitems')
@@ -114,5 +140,127 @@ class FleioUtils {
         throw new Exception($result["message"]);         
       }
     }
+
+    public static function createOverdueClientInvoice($clientId, $amount, $fleioServiceId, $invoicePaymentMethod=NULL, $type='Hosting') {
+      // Calculate date and due date of invoice
+      $dueDays = 0;
+      $today = date('Y-m-d');
+      $dueDate = new DateTime($today);
+      $dueDate->modify('+' . $dueDays . ' day');
+      // Get an admin username, required to use local API 
+      try {
+	    $adminUsername = self::getWHMCSAdmin();
+      } catch (Exception $e) {
+        logActivity('Fleio: ' . $e->getMessage());
+        throw new Exception('Unable to create invoice'); // We do not throw the original message since it may contain sensitive data
+      }
+      // Get the client Fleio product, to create an invoice for
+      if (!$fleioServiceId) {
+        throw new Exception('Fleio: unable to issue invoice for Client ID: ' . $clientId . ' since no OpenStack products found.');
+      }
+      $data = [
+        "date" => $today,
+        "duedate" => $dueDate->format('Y-m-d'),
+        'userid' => $clientId,
+        'sendinvoice' => '1',
+        'itemdescription1' => 'Cloud services',
+        'itemamount1' => $amount,
+        'itemtaxed1' => true];
+      if (!is_null($invoicePaymentMethod)) {
+        $data['paymentmethod'] = $invoicePaymentMethod;
+      }
+      $result = localAPI('CreateInvoice', $data, $adminUsername);
+      if ($result["result"] == "success") {
+        $invoice_id = $result['invoiceid'];
+        Capsule::table('tblinvoiceitems')
+               ->where('invoiceid', (string) $invoice_id)
+               ->update(array("type"=>$type, "relid"=>$fleioServiceId));
+        return $invoice_id;
+      } else {
+        throw new Exception($result["message"]);
+      }
+    }
+
+    public static function getFleioProductsInvoicedAmount($clientId, $fleioPackageId) {
+      // Get the amount already invoiced and unpaid for Fleio active products related to this client
+      // Return an array of: {"amount": .. "currency": .. "product": .. , "invoiced_since_days": ..}
+      $fleioProduct = self::getClientProduct($clientId, $fleioPackageId);
+      $clientCurrency = getCurrency($clientId);
+      if (!$fleioProduct) {
+        throw new Exception('Fleio: unable to issue invoice for Client ID: ' . $clientId . ' since no OpenStack products found.');
+      }
+      $items = Capsule::table('tblinvoiceitems')
+                      ->join('tblclients AS tc', 'tc.id', '=', 'tblinvoiceitems.userid')
+	                  ->join('tblinvoices AS tinv', 'tinv.id', '=', 'tblinvoiceitems.invoiceid')
+                      ->where([['tblinvoiceitems.userid', '=', $clientId], ['tblinvoiceitems.relid', '=', $fleioProduct->id]])
+                      ->select('tblinvoiceitems.amount', 'tblinvoiceitems.userid', 'tc.currency', 'tinv.date', 'tinv.status')->get();
+      $daysSinceLastInvoice = NULL;
+      $amount = 0;
+      foreach($items as $item) {
+          if ($item->status == 'Unpaid') {
+              // Count only unpaid invoices
+	          $amount += $item->amount;
+          }
+          $invIssuedDays = self::daysDiff($item->date);
+          if ($daysSinceLastInvoice == NULL && $invIssuedDays != NULL) {
+            $daysSinceLastInvoice = $invIssuedDays;
+          } else {
+            if ($daysSinceLastInvoice > $invIssuedDays){
+                $daysSinceLastInvoice = $invIssuedDays;
+            }
+          }
+      }
+      return array("amount" => $amount, "currency" => $clientCurrency, "product" => $fleioProduct, 'days_since_last_invoice' => $daysSinceLastInvoice);
+    }
+
+   public static function updateClientsBillingAgreement($flApi, $status='Active') {
+       logActivity('Fleio: update all clients billing agreements');
+       try {
+            $clients = Capsule::table('tblhosting AS th')
+                           ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
+                           ->join('tblclients as tc', 'tc.id', '=', 'th.userid')
+                           ->where('th.domainstatus', '=', $status)
+                           ->where('tp.servertype', '=', 'fleio')
+                           ->select('tc.gatewayid', 'tc.id', 'tc.uuid')
+                           ->get();
+           } catch (Exception $e) {
+             return NULL;
+           }
+        $agreements = [];
+        foreach($clients AS $client) {
+           $hasAgreement = isset($client->gatewayid) && !(is_null($client->gatewayid)) && !(empty($client->gatewayid));
+           $clientAgreement = array("uuid" => $client->uuid, "agreement" => $hasAgreement);
+           array_push($agreements, $clientAgreement);
+        };
+        if (sizeof($agreements)) {
+          $url = '/clients/set_billing_agreements';
+          try {
+            $flApi->post($url, $agreements);
+          } catch (Exception $e) {
+            logActivity('Fleio update billing agreements FAIL: '. $e->getMessage());
+          }
+        }
+   }
+   public static function captureInvoicePayment($invoiceId) {
+        $data = array('invoiceid' => $invoiceId);
+        $result = localAPI('CapturePayment', $data);
+        if (is_array($result) && $result['result'] != 'success') {
+            $captureMessage = $result['message'];
+        } else {
+            $captureMessage = 'Captured successfully';
+        }
+        logActivity('Fleio: capture Invoice ID: '. $invoiceId .' '.$captureMessage);
+   }
+  public static function getClientPaymentMethod($clientId) {
+        try {
+            $pgw = Capsule::table('tblclient AS tc')
+                           ->join('tblpaymentgateways AS tgw', 'tc.gatewayid', '=', 'tgw.id')
+                           ->select('tgw.gateway')
+                           ->first();
+           return $pgw->gateway;
+        } catch (Exception $e) {
+           return NULL;
+        }
+  }
 }
 

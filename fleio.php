@@ -76,7 +76,7 @@ function fleio_ConfigOptions() {
         "FriendlyName" => "Fleio Configuration Name",
         "Type" => "text",
 		"Size" => "32",
-        "Description" => "Configuration name to set for Fleio clients",
+        "Description" => "Fleio configuration for new clients",
         "Default" => ""
     ),
     "userprefix" => array (
@@ -85,6 +85,21 @@ function fleio_ConfigOptions() {
         "Size" => "12",
         "Description" => "Leave blank for 'whmcs'",
         "Default" => "whmcs",
+    ),
+    "issueinvoice" => array (
+        "FriendlyName" => "Invoice clients without billing agreement",
+	"Type" => "yesno",
+	"Description" => "Issue invoice at the end of billing cycle for clients without billing agreement",
+    ),
+    "issueInvWAgr" => array (
+        "FriendlyName" => "Invoice clients with billing agreement",
+	"Type" => "yesno",
+	"Description" => "Issue invoice at the end of billing cycle for clients with billing agreement",
+    ),
+    "chargeInvoiceRightAway" => array (
+        "FriendlyName" => "Attempt a charge immediately",
+    "Type" => "yesno",
+    "Description" => "Attempt charging of auto generated invoices when CC is on file immediately after the invoice was issued",
     ),
     );
     return $configarray;
@@ -135,7 +150,7 @@ function fleio_login($params) {
     try {
         $url = $fl->getSSOUrl();
         header("Location: " . $url);
-        return "success";
+        exit;
     } catch (FlApiException $e) {
         logActivity('Fleio SSO login error: ' . $e->getMessage());
         return "Unable to retrieve a SSO session";
@@ -266,12 +281,27 @@ function actionOverview($params, $request) {
 		$tax2_rate = $tax2['rate'];
 	}
 
+    $uptodateCredit = NULL;
+    $outofcreditDatetime = NULL;
+    $fleioClientCurrency = NULL;
     $whmcsClientCurrency = getCurrency($params['clientsdetails']['userid']);
+    if (is_array($client) && array_key_exists('uptodate_credit', $client) && array_key_exists('outofcredit_datetime', $client)) {
+        $uptodateCredit = $client['uptodate_credit'];
+        $outofcreditDatetime = $client['outofcredit_datetime'];
+        $fleioClientCurrency = getCurrency($client['currency']);
+        try {
+          $uptodateCreditFormatted = formatCurrency($uptodateCredit, $fleioClientCurrency['id']);
+        } catch (Exception $e) { 
+          $uptodateCreditFormatted = '' . $uptodateCredit; 
+        }
+    }
     return array('minamount' => $minamount,
                  'maxamount' => $maxamount,
                  'tax1_rate' => $tax1_rate,
 				 'tax2_rate' => $tax2_rate,
-                 'currency' => $whmcsClientCurrency);
+                 'currency' => $whmcsClientCurrency,
+                 'uptodateCredit' => $uptodateCreditFormatted,
+                 'outofcreditDatetime' => $outofcreditDatetime);
 }
 
 
@@ -311,11 +341,10 @@ function actionCreateInvoice($params, $request) {
     }
  
     $service = FleioUtils::getServiceById($params['serviceid']);
-    $add_credit_msg = isset($_LANG['fleioaddcredit']) ? $_LANG['fleioaddcredit'] : 'Add credit for';
     $clientsdetails = $params['clientsdetails'];
     $values["userid"] = $clientsdetails['userid'];
     $values["sendinvoice"] = true;
-    $values["itemdescription1"] = $add_credit_msg.' '.$service->name;
+    $values["itemdescription1"] = $service->name;
     $values["itemamount1"] = $amount;
     $values["itemtaxed1"] = true;
 

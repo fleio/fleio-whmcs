@@ -28,10 +28,12 @@ if ($ca->isLoggedIn()) {
                     ->first();
     } catch (Exception $e) {
         header('Location: clientarea.php' );
-        return;
+        exit;
     }
     header('Location: ' . 'clientarea.php?action=productdetails&id=' . $prodId->id);
+    exit;
  
 } else {
     header('Location: ' . 'clientarea.php'); 
+    exit;
 }
