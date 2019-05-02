@@ -88,18 +88,25 @@ function fleio_ConfigOptions() {
     ),
     "issueinvoice" => array (
         "FriendlyName" => "Invoice clients without billing agreement",
-	"Type" => "yesno",
-	"Description" => "Issue invoice at the end of billing cycle for clients without billing agreement",
+	    "Type" => "yesno",
+	    "Description" => "Issue invoice at the end of billing cycle for clients without billing agreement",
     ),
     "issueInvWAgr" => array (
         "FriendlyName" => "Invoice clients with billing agreement",
-	"Type" => "yesno",
-	"Description" => "Issue invoice at the end of billing cycle for clients with billing agreement",
+	    "Type" => "yesno",
+	    "Description" => "Issue invoice at the end of billing cycle for clients with billing agreement",
     ),
     "chargeInvoiceRightAway" => array (
         "FriendlyName" => "Attempt a charge immediately",
-    "Type" => "yesno",
-    "Description" => "Attempt charging of auto generated invoices when CC is on file immediately after the invoice was issued",
+        "Type" => "yesno",
+        "Description" => "Attempt charging of auto generated invoices when CC is on file immediately after the invoice was issued",
+    ),
+    "gatewaysPrefixForBillingAg" => array (
+        "FriendlyName" => "Prefix for gateways to use for billing agreement",
+        "Type" => "text",
+        "Size" => "32",
+        "Description" => "Comma separated string, each entry representing a prefix for a gateway that uses billing agreements. Leave empty to take into account all gateway ids",
+        "Default" => ""
     ),
     );
     return $configarray;

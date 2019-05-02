@@ -181,6 +181,25 @@ class FleioUtils {
       }
     }
 
+    public static function clientHasBillingAgreement($gatewayid, $prefixes) {
+      // checks if client gatewayid is suitable for billing agreements based on it's prefix
+      $hasAgreement = false;
+      $includeGatewaysWithPrefixArr = explode(',', $prefixes);
+      if (isset($gatewayid) && !(is_null($gatewayid)) && !(empty($gatewayid))) {
+        if (trim($prefixes) == '') {
+          $hasAgreement = true;
+        } else {
+          foreach($includeGatewaysWithPrefixArr AS $validPrefix) {
+            $validPrefix = trim($validPrefix); // remove whitespaces if they exist
+            if ($validPrefix && strpos($gatewayid, $validPrefix) === 0) {
+              $hasAgreement = true;
+            }
+          }
+        }
+      }
+      return $hasAgreement;  
+    }
+
     public static function getFleioProductsInvoicedAmount($clientId, $fleioPackageId) {
       // Get the amount already invoiced and unpaid for Fleio active products related to this client
       // Return an array of: {"amount": .. "currency": .. "product": .. , "invoiced_since_days": ..}
@@ -213,7 +232,7 @@ class FleioUtils {
       return array("amount" => $amount, "currency" => $clientCurrency, "product" => $fleioProduct, 'days_since_last_invoice' => $daysSinceLastInvoice);
     }
 
-   public static function updateClientsBillingAgreement($flApi, $status='Active') {
+   public static function updateClientsBillingAgreement($flApi, $status='Active', $includeGatewaysWithPrefix='') {
        logActivity('Fleio: update all clients billing agreements');
        try {
             $clients = Capsule::table('tblhosting AS th')
@@ -227,10 +246,10 @@ class FleioUtils {
              return NULL;
            }
         $agreements = [];
-        foreach($clients AS $client) {
-           $hasAgreement = isset($client->gatewayid) && !(is_null($client->gatewayid)) && !(empty($client->gatewayid));
-           $clientAgreement = array("uuid" => $client->uuid, "agreement" => $hasAgreement);
-           array_push($agreements, $clientAgreement);
+        foreach($clients AS $client) {   
+          $hasAgreement = self::clientHasBillingAgreement($client->gatewayid, $includeGatewaysWithPrefix); 
+          $clientAgreement = array("uuid" => $client->uuid, "agreement" => $hasAgreement);
+          array_push($agreements, $clientAgreement);
         };
         if (sizeof($agreements)) {
           $url = '/clients/set_billing_agreements';

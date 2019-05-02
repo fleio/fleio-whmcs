@@ -38,6 +38,7 @@ The WHMCS module supports the following:
 * ability to create new invoices for Fleio credit
 * auto update of Fleio client details if WHMCS client is updated
 * auto update of Fleio client when he adds a billing agreement or CC in WHMCS
+   * you can filter the billing agreement ID prefix that leads to client marked as having a billing agreement in Fleio. For instance you can consider clients with a Stripe billing agreement ( prefix "cus_"), but not does with a PayPal billing agrement (prefix "B-").
 * auto issue of invoices for Fleio clients passing a certain amount in usage before the end of a month
 * auto issue of invoices for Fleio clients at the end of a month
 * auto charge attempt after an invoice is issued for clients with a billing agreement or CC on file
