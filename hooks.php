@@ -33,7 +33,7 @@ function fleio_PostCronjob() {
         logActivity('Fleio: Looking at clients with and without a billing agreement');
       };
       $flApi = new FlApi($server->configoption4, $server->configoption1);
-      FleioUtils::updateClientsBillingAgreement($flApi);
+      FleioUtils::updateClientsBillingAgreement($flApi, 'Active', $server->configoption13);
       logActivity('Fleio: retrieving all overdue clients');
       $url = "/clients/over_credit_limit";
       $urlParams = array(
@@ -58,7 +58,7 @@ function fleio_PostCronjob() {
             try {
                 $clientFromUUID = FleioUtils::getUUIDClient($clientOl['external_billing_id']);
                 if ($clientFromUUID != NULL) {
-                    $clientHasBillingAgreement = !is_null($clientFromUUID->gatewayid) && !empty($clientFromUUID->gatewayid);
+                    $clientHasBillingAgreement = FleioUtils::clientHasBillingAgreement($clientFromUUID->gatewayid, $server->configoption13);
                     $alreadyInvoicedAndUnpaid = FleioUtils::getFleioProductsInvoicedAmount($clientFromUUID->id, $server->id);
                     $fleioWhmcsService = $alreadyInvoicedAndUnpaid['product'];
                     $fleioWhmcsServiceId = $fleioWhmcsService->id;
