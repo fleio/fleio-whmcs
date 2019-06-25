@@ -8,6 +8,11 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 use WHMCS\Module\Queue as ModuleQueue;
 
 class FleioUtils {
+    private static $gateway_id_to_gateway_map = array(
+      'B-' => 'paypalbilling',
+      'cus_' => 'stripe'
+    );
+
     public function __construct(){}
 
     public static function getWHMCSAdmin() {
@@ -233,21 +238,29 @@ class FleioUtils {
     }
 
    public static function updateClientsBillingAgreement($flApi, $status='Active', $includeGatewaysWithPrefix='') {
-       logActivity('Fleio: update all clients billing agreements');
+    logActivity('Fleio: update all clients billing agreements');
        try {
             $clients = Capsule::table('tblhosting AS th')
                            ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
                            ->join('tblclients as tc', 'tc.id', '=', 'th.userid')
                            ->where('th.domainstatus', '=', $status)
                            ->where('tp.servertype', '=', 'fleio')
-                           ->select('tc.gatewayid', 'tc.id', 'tc.uuid')
+                           ->select('tc.gatewayid', 'tc.id', 'tc.uuid', 'th.paymentmethod')
                            ->get();
            } catch (Exception $e) {
              return NULL;
            }
         $agreements = [];
         foreach($clients AS $client) {   
-          $hasAgreement = self::clientHasBillingAgreement($client->gatewayid, $includeGatewaysWithPrefix); 
+          $hasAgreement = self::clientHasBillingAgreement($client->gatewayid, $includeGatewaysWithPrefix);
+          if ($hasAgreement) {
+            foreach(FleioUtils::$gateway_id_to_gateway_map AS $key => $gateway) {
+              if (substr($client->gatewayid, 0, strlen($key)) === $key) {
+                $hasAgreement = FleioUtils::$gateway_id_to_gateway_map[$key] === $client->paymentmethod;
+                break;
+              }
+            };
+          }
           $clientAgreement = array("uuid" => $client->uuid, "agreement" => $hasAgreement);
           array_push($agreements, $clientAgreement);
         };

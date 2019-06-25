@@ -82,7 +82,11 @@ function fleio_PostCronjob() {
                         }
                         continue;
                     }
-                    if ($amountUsedAndUninvoiced > 0 && $amountUsedAndUninvoiced >= (0 - $clientOl['effective_credit_limit'])) {
+                    
+                    if ($amountUsedAndUninvoiced > 0 && 
+                        $amountUsedAndUninvoiced >= (0 - $clientOl['effective_credit_limit']) &&
+                        $daysSinceLastInvoice > 0) 
+                    {
                         // Invoice if client is over limit and no unpaid invoice exists to cover it and no invoice was issued in the last few days
                         $invoicePaymentMethod = $fleioWhmcsService->paymentmethod;
                         // Use the Client payment method instead of the service one
