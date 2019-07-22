@@ -39,6 +39,9 @@
            {if $validateAmountError}
             <div class="text-danger text-center limit-near">{$validateAmountError}</div>
            {/if}
+           {if $validateServiceError}
+            <div class="text-danger text-center limit-near">{$validateServiceError}</div>
+           {/if}
        </div>
     </div>
 </div>
