@@ -115,6 +115,78 @@ function fleio_PostCronjob() {
       logActivity('Fleio: unable to retrieve over credit clients from '. $server->configoption4 . ' (' . $e->getMessage() . ')');
       continue;
    }
+
+   // get suspended services in order to update their status in whmcs
+   $servicesNext = true;
+   $servicePage = 0;
+   while($servicesNext) {
+       $servicePage = $servicePage + 1;
+       try {
+            logActivity('Fleio: using server ' . $server->configoption4);
+            $servicesUrl = "/billing/services?filtering=product__product_type:openstack%2Bstatus:suspended&page=". (string)$servicePage . "&";
+            $suspendedServices = $flApi->get($servicesUrl, array());
+            if (!$suspendedServices['next']) {
+                $servicesNext = false;
+            }
+            foreach ($suspendedServices['objects'] as $serviceToSuspend) {
+                if ($serviceToSuspend['client']['external_billing_id']) {
+                    $clientFromUUID = FleioUtils::getUUIDClient($serviceToSuspend['client']['external_billing_id']);
+                    if ($clientFromUUID !== NULL) {
+                        $whmcsService = Capsule::table('tblhosting')
+                        ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
+                        ->where('tblproducts.servertype', '=', 'fleio')
+                        ->where('tblhosting.userid', '=', $clientFromUUID->id)
+                        ->select('tblhosting.domainstatus')
+                        ->first();
+                        if ($whmcsService->domainstatus !== 'Suspended') {
+                            Capsule::table('tblhosting')
+                            ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
+                            ->where('tblproducts.servertype', '=', 'fleio')
+                            ->where('tblhosting.userid', '=', $clientFromUUID->id)
+                            ->update(array("domainstatus"=>'Suspended'));
+                            logActivity('Fleio: marking service of client with id ' . $clientFromUUID->id . ' as suspended to reflect Fleio OS service');
+                        }
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            logActivity('Fleio: unable to retrieve suspended services from '. $server->configoption4 . ' (' . $e->getMessage() . ')');
+            $servicesNext = false;
+            continue;
+        }
+    }
+
+    // get suspended services in whmcs and resume them if they are active in fleio
+    $suspendedServicesInWhmcs = Capsule::table('tblhosting')
+    ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
+    ->where('tblproducts.servertype', '=', 'fleio')
+    ->where('tblhosting.domainstatus', '=', 'Suspended')->get();
+    foreach ($suspendedServicesInWhmcs as $whmcsSuspendedService) {
+        $relatedClient = Capsule::table('tblclients')
+        ->join('tblhosting', 'tblhosting.userid', '=', 'tblclients.id')
+        ->where('tblclients.id', '=', $whmcsSuspendedService->userid)
+        ->select('tblclients.uuid', 'tblclients.id')
+        ->first();
+        try {
+            $relatedServiceUrl = "/billing/services?filtering=client__external_billing_id:" . $relatedClient->uuid . "&";
+            $relatedServiceResponse = $flApi->get($relatedServiceUrl, array());
+            if ($relatedServiceResponse['objects']) {
+                if ($relatedServiceResponse['objects'][0]['status'] === 'active') {
+                    Capsule::table('tblhosting')
+                    ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
+                    ->where('tblproducts.servertype', '=', 'fleio')
+                    ->where('tblhosting.userid', '=', $relatedClient->id)
+                    ->update(array("domainstatus"=>"Active"));
+                    logActivity('Fleio: marking service of client with id ' . $relatedClient->id . ' as active to reflect Fleio OS service');
+                }
+            }
+        } catch (Exception $e) {
+            logActivity('Fleio: unable to retrieve fleio services related to whmcs suspended services from '. 
+                $server->configoption4 . ' (' . $e->getMessage() . ')');
+            continue;
+        }
+    }
+
  }
 }
 
