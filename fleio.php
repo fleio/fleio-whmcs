@@ -330,6 +330,12 @@ function validateAmount($original_amount, $min, $max) {
    return $amount;
 }
 
+function canAddCredit($serviceStatus) {
+    if ($serviceStatus === 'Suspended' || $serviceStatus === 'Cancelled' || $serviceStatus === 'Terminated') {
+        throw new Exception("You cannot add credit while your service status is " . $serviceStatus . ".");
+    }
+}
+
 
 function actionCreateInvoice($params, $request) {
     # Action used for the Add Credit functionality
@@ -348,6 +354,14 @@ function actionCreateInvoice($params, $request) {
     }
  
     $service = FleioUtils::getServiceById($params['serviceid']);
+    if ($service) {
+        try {
+            canAddCredit($service->domainstatus);
+        } catch (Exception $e) {
+            $overview_vars = actionOverview($params, $request);
+            return array_merge($overview_vars, array('validateServiceError' => $e->getMessage(),));
+        }
+    }
     $clientsdetails = $params['clientsdetails'];
     $values["userid"] = $clientsdetails['userid'];
     $values["sendinvoice"] = true;
