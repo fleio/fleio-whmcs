@@ -35,7 +35,7 @@ class FleioUtils {
         try {
             $sndDate = date(strtotime($stringDate));
             $datediff = time() - $sndDate;
-            return round($datediff / (60 * 60 * 24));
+            return floor($datediff / (60 * 60 * 24));
         } catch (Exception $e) {
             logActivity('Fleio: unable to convert dates!');
             return NULL;
@@ -65,14 +65,18 @@ class FleioUtils {
                              ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
                              ->where('th.userid', '=', $clientId)
                              ->where('th.domainstatus', '=', $status)
-                             ->where('tp.servertype', '=', 'fleio')->first();
+                             ->where('tp.servertype', '=', 'fleio')
+                             ->select('th.*')
+                             ->first();
           } else {
             $prod = Capsule::table('tblhosting AS th')
                             ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
                             ->where('th.userid', '=', $clientId)
                             ->where('th.domainstatus', '=', $status)
                             ->where('tp.id', '=', $packageId)
-                            ->where('tp.servertype', '=', 'fleio')->first(); 
+                            ->where('tp.servertype', '=', 'fleio')
+                            ->select('th.*')
+                            ->first(); 
           }
       } catch (Exception $e) {
         return NULL;
@@ -226,7 +230,7 @@ class FleioUtils {
 	          $amount += $item->amount;
           }
           $invIssuedDays = self::daysDiff($item->date);
-          if ($daysSinceLastInvoice == NULL && $invIssuedDays != NULL) {
+          if ($daysSinceLastInvoice === NULL && $invIssuedDays !== NULL) {
             $daysSinceLastInvoice = $invIssuedDays;
           } else {
             if ($daysSinceLastInvoice > $invIssuedDays){

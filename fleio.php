@@ -331,7 +331,7 @@ function validateAmount($original_amount, $min, $max) {
 }
 
 function canAddCredit($serviceStatus) {
-    if ($serviceStatus === 'Suspended' || $serviceStatus === 'Cancelled' || $serviceStatus === 'Terminated') {
+    if ($serviceStatus === 'Cancelled' || $serviceStatus === 'Terminated') {
         throw new Exception("You cannot add credit while your service status is " . $serviceStatus . ".");
     }
 }

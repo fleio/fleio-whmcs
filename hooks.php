@@ -63,7 +63,7 @@ function fleio_PostCronjob() {
                     $fleioWhmcsService = $alreadyInvoicedAndUnpaid['product'];
                     $fleioWhmcsServiceId = $fleioWhmcsService->id;
                     $daysSinceLastInvoice = $alreadyInvoicedAndUnpaid['days_since_last_invoice'];
-                    $daysSinceLastInvoice = $daysSinceLastInvoice == NULL ? 999999 : $daysSinceLastInvoice; // set a large enough value in case of NULL
+                    $daysSinceLastInvoice = $daysSinceLastInvoice === NULL ? 999999 : $daysSinceLastInvoice; // set a large enough value in case of NULL
                     $amountInvoiced = $alreadyInvoicedAndUnpaid["amount"];
                     $amountUsedAndUninvoiced = 0 - $clientOl['uptodate_credit'] - $amountInvoiced;
                     // Check unsettled Fleio billing histories
