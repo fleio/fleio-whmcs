@@ -1,5 +1,5 @@
-Fleio WHMCS module
-==================
+## Fleio WHMCS module
+
 
 This is the Fleio WHMCS module to allow integration between WHMCS and Fleio.
 
@@ -8,8 +8,8 @@ enables service providers to sell public cloud services.
 
 
 
-Installation
-============
+## Installation
+
 
 **Requires WHMCS 7.x**
 
@@ -27,8 +27,8 @@ Installation
     
     The Client Group name can be set through the /backend/admin/ at `Fleio core app` -> `Client groups`
 
-How the module works
-====================
+## How the module works
+
 
 The WHMCS module supports the following: 
 * WHMCS product actions: Create. Suspend, Unsuspend and Terminate
@@ -43,20 +43,25 @@ The WHMCS module supports the following:
 * auto issue of invoices for Fleio clients at the end of a month
 * auto charge attempt after an invoice is issued for clients with a billing agreement or CC on file
 
-How does the module issue new invoices
-======================================
+## How does the module issue new invoices
 
 We will assume a credit limit exists in Fleio:
 
 * for clients without a billing agreement or CC on file of: -10 USD
 * for clients with a billing agreement or CC on file of: -20 USD
 
+We have the following limit in WHMCS:
+*Do not invoice amount below*: 1 USD
+
+Also, we will have the following terms:
+* uninvoiced ussage: the difference between total usage and invoiced usage
+
 If *Invoice clients without billing agreement* is checked in the Fleio Module Settings in WHMCS, all clients that do not have a billing agreement or CC on file in WHMCS will be issued invoices as follows:
 
-* when they reach a usage of over 10 USD at any time during a month
-* when a month passes, for the amount used if it's lower than the credit limit
+* any time during a month, if uninvoiced usage exceeds the credit limit defined in Fleio configuration (10 USD in our example)
+* at the end a billing cycle (one month), for the amount consumed if it's not lower than the *Do not invoice amount below* limit
 
-The same as the above applies for clients with a billing agreement of CC on file when "Invoice clients with billing agreement" is checked with the usage being over 20 USD.
+The same as the above applies for clients with a billing agreement of CC on file when *Invoice clients with billing agreement* is checked with the usage being over 20 USD.
 If the option *Attempt a charge immediately* is also checked, then a charge is attempted automatically for these clients, for the invoices issued.
 
 When a client passes his credit limit the second time during a month, a second invoice will be issued and so on.
@@ -69,6 +74,65 @@ auto charging may fail if the new gateway does not support this.
 If auto generated invoices are deleted or marked canceled, new invoices will be issued.
 
 Clients usage is checked every time the WHMCS cron runs. The default recommended period is 5 minutes.
+
+## Scenarios
+
+
+#### Scenario 1 
+
+* The *Do not invoice amount below* limit is 1 USD.
+* The *Credit limit when on agreement* limit is set to 50 USD.
+* The *Delay suspend* limit is set to 30 days
+
+At the end of billing cycle, the client has a total cost of services of 10 USD. An invoice will be issued, with the value of 10 USD. Invoice status is unpaid.
+
+The next day (1st day after the end of the billing cycle) the total cost of services rises up to 20 USD. Invoice will not be issued, since the *Credit limit when on agreement* limit was not reached. 
+
+On the 4th day, the total cost of services rises up to 50 USD. Invoice will still not be issued, since the *Credit limit when on agreement* limit was not reached:
+Currently, the client has an invoice of 10 USD, the total costs of services is 50 USD. Uninvoiced usage is equal to 40 USD. The limit is not reached, no invoice is issued. The suspension timer starts since it reached the 50 USD owned mark.
+
+On the 5th day, the total cost gets to 59.9 USD. Invoice will not be issued.
+
+On the 6th day, the cost gets to 60 USD. Invoice will be issued, with the total cost of 50 USD. Uninvoiced credit resets to 0 USD.
+
+On the 25th day of the billing cycle, the costs gets to 90 USD. No invoice will be issued. The uninvoiced credit is 30 USD, which is lower than the *Credit limit when on agreement* limit.
+
+On the 29th day, the costs gets to 110 USD. Uninvoiced credit is 50 USD, so a new invoice will be issued, with the value of 50 USD. 
+
+
+Upon this date, all the invoices are still unpaid. If the invoices are still unpaid on 34th day the client gets suspended. Why?
+
+1. The suspension timer started on 4th day
+2. The *delay suspend* limit is 30 days. 
+
+#### Scenario 2
+
+* The *Do not invoice amount below* limit is 1 USD.
+* The *Credit limit when on agreement* limit is set to 50 USD.
+* The *Delay suspend* limit is set to 30 days
+
+At the end of the billing cycle, the client has 0 uninvoiced usage, and all the invoices are paid.
+
+On the 1st day of the billing cycle, the client will consume a total of 0.23 USD. No invoice will be issued since it does not reach the *Credit limit when on agreement* limit is set to 50 USD.
+
+On the 3rd day, he has a cost total cost os 0.96 USD. No invoice will be issued. He deletes all the resources and does not create any other cost for the rest of the billing cycle.
+
+At the end of the billing cycle, the client still won't be invoiced, since the uninvoiced usage does not pass the *Do not invoice amount below* limit.
+If you wish to invoice the 0.96 USD at the end of the billing cycle, just set `The Do not invoice amount below: 0 USD`.
+
+#### Scenario 3
+
+* The *Do not invoice amount below* limit is 1 USD 
+* The *Credit limit when on agreement* limit is set to 50 USD
+* The *Delay suspend* limit is set to 30 days
+
+At the end of the billing cycle, the client has 0 uninvoiced usage, and all the invoices are paid.
+
+On the 1st day of the billing cycle, the client will consume a total of 0.23 USD. No invoice will be issued since it does not reach the *Credit limit when on agreement* limit is set to 50 USD.
+
+On the 3rd day, he has a cost total cost of 1 USD. No invoice will be issued since it does not reach the 2nd limit. He deletes all the resources and no further costs is generated.
+
+At the end of the billing cycle it will be issued an invoice of 1 USD. 
 
 
 Additional notes
@@ -84,4 +148,4 @@ all Fleio client's services should be checked to have prices in the new currency
 License information
 ===================
 
-fleio-whmcs is licensed under BSD License. See the "LICENSE" file for more information.
+fleio-whmcs is licensed under BSD License. See the *LICENSE* file for more information.
