@@ -241,7 +241,7 @@ class FleioUtils {
       return array("amount" => $amount, "currency" => $clientCurrency, "product" => $fleioProduct, 'days_since_last_invoice' => $daysSinceLastInvoice);
     }
 
-   public static function updateClientsBillingAgreement($flApi, $status='Active', $includeGatewaysWithPrefix='') {
+  public static function updateClientsBillingAgreement($flApi, $status='Active', $includeGatewaysWithPrefix='') {
     logActivity('Fleio: update all clients billing agreements');
        try {
             $clients = Capsule::table('tblhosting AS th')
@@ -276,17 +276,30 @@ class FleioUtils {
             logActivity('Fleio update billing agreements FAIL: '. $e->getMessage());
           }
         }
-   }
-   public static function captureInvoicePayment($invoiceId) {
-        $data = array('invoiceid' => $invoiceId);
-        $result = localAPI('CapturePayment', $data);
-        if (is_array($result) && $result['result'] != 'success') {
-            $captureMessage = $result['message'];
-        } else {
-            $captureMessage = 'Captured successfully';
-        }
-        logActivity('Fleio: capture Invoice ID: '. $invoiceId .' '.$captureMessage);
-   }
+  }
+  public static function markBillingHistoriesAsInvoiced($flApi, $clientExternalBillingId) {
+    logActivity('Fleio: marking client\'s ' . $clientExternalBillingId . ' billing histories as invoiced.');
+    $url = '/clients/mark_billing_histories_as_invoiced';
+    $params = array("client_external_billing_id" => $clientExternalBillingId);
+    try {
+      $flApi->post($url, $params);
+    } catch (Exception $e) {
+      logActivity(
+        'Fleio: marking client\'s ' . $clientExternalBillingId . ' billing histories as invoiced failed. Reason: ' . 
+        $e->getMessage()
+      );
+    }
+  }
+  public static function captureInvoicePayment($invoiceId) {
+      $data = array('invoiceid' => $invoiceId);
+      $result = localAPI('CapturePayment', $data);
+      if (is_array($result) && $result['result'] != 'success') {
+          $captureMessage = $result['message'];
+      } else {
+          $captureMessage = 'Captured successfully';
+      }
+      logActivity('Fleio: capture Invoice ID: '. $invoiceId .' '.$captureMessage);
+  }
   public static function getClientPaymentMethod($clientId) {
         try {
             $pgw = Capsule::table('tblclient AS tc')

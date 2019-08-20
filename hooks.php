@@ -77,6 +77,7 @@ function fleio_PostCronjob() {
                         $amountInvoiced += $amountUsedAndUninvoiced;
                         $amountUsedAndUninvoiced = 0;
                         $numInvoicedClients += 1;
+                        FleioUtils::markBillingHistoriesAsInvoiced($flApi, $clientOl['external_billing_id']);
                         if ($capturePaymentImmediately && $clientHasBillingAgreement) {
                             FleioUtils::captureInvoicePayment($invoiceId);
                         }
