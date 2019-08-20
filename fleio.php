@@ -108,6 +108,13 @@ function fleio_ConfigOptions() {
         "Description" => "Comma separated string, each entry representing a prefix for a gateway that uses billing agreements. Leave empty to take into account all gateway ids",
         "Default" => ""
     ),
+    "doNotInvoiceAmountBelow" => array (
+        "FriendlyName" => "Do not invoice amount below",
+        "Type" => "text",
+        "Size" => "10",
+        "Default" => "0",
+        "Description" => "".$default_currency_code
+    ),
     );
     return $configarray;
 }
