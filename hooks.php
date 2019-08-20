@@ -67,36 +67,46 @@ function fleio_PostCronjob() {
                     $amountInvoiced = $alreadyInvoicedAndUnpaid["amount"];
                     $amountUsedAndUninvoiced = 0 - $clientOl['uptodate_credit'] - $amountInvoiced;
                     // Check unsettled Fleio billing histories
-                    if ($amountUsedAndUninvoiced > 0 && sizeof($clientOl['unsettled_periods']) > 0 && $daysSinceLastInvoice > 0) {
-                        // Invoice if client is not over limit but has reached his billing cycle and no invoice was issued in the previous day
-                        $invoicePaymentMethod = $fleioWhmcsService->paymentmethod;
-                        // Use the client payment method instead of the Service one
-                        // $invoicePaymentMethod = FleioUtils::getClientPaymentMethod($clientFromUUID->id);
-                        $invoiceId = FleioUtils::createOverdueClientInvoice($clientFromUUID->id, $amountUsedAndUninvoiced, $fleioWhmcsServiceId, $invoicePaymentMethod);
-                        logActivity('Fleio: issued Invoice ID: '. $invoiceId .' for User ID: '. $clientFromUUID->id. ' due to end of cycle for '. $amountUsedAndUninvoiced . ' ' . $alreadyInvoicedAndUnpaid["currency"]["code"]);
-                        $amountInvoiced += $amountUsedAndUninvoiced;
-                        $amountUsedAndUninvoiced = 0;
-                        $numInvoicedClients += 1;
-                        FleioUtils::markBillingHistoriesAsInvoiced($flApi, $clientOl['external_billing_id']);
-                        if ($capturePaymentImmediately && $clientHasBillingAgreement) {
-                            FleioUtils::captureInvoicePayment($invoiceId);
+                    if ($amountUsedAndUninvoiced > 0) {
+                        $clientCurrency = getCurrency($clientFromUUID->id);
+                        $doNotInvoiceAmountBelow = $server->configoption14;
+                        if ($doNotInvoiceAmountBelow === NULL) {
+                            $doNotInvoiceAmountBelow = "0";
                         }
-                        continue;
-                    }
-                    
-                    if ($amountUsedAndUninvoiced > 0 && 
-                        $amountUsedAndUninvoiced >= (0 - $clientOl['effective_credit_limit']) &&
-                        $daysSinceLastInvoice > 0) 
-                    {
-                        // Invoice if client is over limit and no unpaid invoice exists to cover it and no invoice was issued in the last few days
-                        $invoicePaymentMethod = $fleioWhmcsService->paymentmethod;
-                        // Use the Client payment method instead of the service one
-                        // $invoicePaymentMethod = FleioUtils::getClientPaymentMethod($clientFromUUID->id);
-                        $invoiceId = FleioUtils::createOverdueClientInvoice($clientFromUUID->id, $amountUsedAndUninvoiced, $fleioWhmcsServiceId, $invoicePaymentMethod);
-                        logActivity('Fleio: issued Invoice ID: '. $invoiceId .' for User ID: '. $clientFromUUID->id. ' for over credit limit of '. $amountUsedAndUninvoiced . ' ' . $alreadyInvoicedAndUnpaid["currency"]["code"]);
-                        $numInvoicedClients += 1;
-                        if ($capturePaymentImmediately && $clientHasBillingAgreement) {
-                            FleioUtils::captureInvoicePayment($invoiceId);
+                        $doNotInvoiceAmountBelow = (float)$doNotInvoiceAmountBelow;
+                        $doNotInvoiceAmountBelowClientCurrency = convertCurrency($doNotInvoiceAmountBelow, 1, $clientCurrency['id']);
+                        if ($amountUsedAndUninvoiced >= $doNotInvoiceAmountBelowClientCurrency) {
+                            if (sizeof($clientOl['unsettled_periods']) > 0 && $daysSinceLastInvoice > 0) {
+                                // Invoice if client is not over limit but has reached his billing cycle and no invoice was issued in the last 24h
+                                $invoicePaymentMethod = $fleioWhmcsService->paymentmethod;
+                                // Use the client payment method instead of the Service one
+                                // $invoicePaymentMethod = FleioUtils::getClientPaymentMethod($clientFromUUID->id);
+                                $invoiceId = FleioUtils::createOverdueClientInvoice($clientFromUUID->id, $amountUsedAndUninvoiced, $fleioWhmcsServiceId, $invoicePaymentMethod);
+                                logActivity('Fleio: issued Invoice ID: '. $invoiceId .' for User ID: '. $clientFromUUID->id. ' due to end of cycle for '. $amountUsedAndUninvoiced . ' ' . $alreadyInvoicedAndUnpaid["currency"]["code"]);
+                                $amountInvoiced += $amountUsedAndUninvoiced;
+                                $amountUsedAndUninvoiced = 0;
+                                $numInvoicedClients += 1;
+                                FleioUtils::markBillingHistoriesAsInvoiced($flApi, $clientOl['external_billing_id']);
+                                if ($capturePaymentImmediately && $clientHasBillingAgreement) {
+                                    FleioUtils::captureInvoicePayment($invoiceId);
+                                }
+                                continue;
+                            }
+
+                            if ($amountUsedAndUninvoiced >= (0 - $clientOl['effective_credit_limit']) &&
+                                $daysSinceLastInvoice > 0)
+                            {
+                                // Invoice if client is over limit and no unpaid invoice exists to cover it and no invoice was issued in the last 24h
+                                $invoicePaymentMethod = $fleioWhmcsService->paymentmethod;
+                                // Use the Client payment method instead of the service one
+                                // $invoicePaymentMethod = FleioUtils::getClientPaymentMethod($clientFromUUID->id);
+                                $invoiceId = FleioUtils::createOverdueClientInvoice($clientFromUUID->id, $amountUsedAndUninvoiced, $fleioWhmcsServiceId, $invoicePaymentMethod);
+                                logActivity('Fleio: issued Invoice ID: '. $invoiceId .' for User ID: '. $clientFromUUID->id. ' for over credit limit of '. $amountUsedAndUninvoiced . ' ' . $alreadyInvoicedAndUnpaid["currency"]["code"]);
+                                $numInvoicedClients += 1;
+                                if ($capturePaymentImmediately && $clientHasBillingAgreement) {
+                                    FleioUtils::captureInvoicePayment($invoiceId);
+                                }
+                            }
                         }
                     }
                 } else {
