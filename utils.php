@@ -279,7 +279,7 @@ class FleioUtils {
   }
   public static function markBillingHistoriesAsInvoiced($flApi, $clientExternalBillingId) {
     logActivity('Fleio: marking client\'s ' . $clientExternalBillingId . ' billing histories as invoiced.');
-    $url = '/clients/mark_billing_histories_as_invoiced';
+    $url = '/openstack/billing/history/mark_billing_histories_as_invoiced';
     $params = array("client_external_billing_id" => $clientExternalBillingId);
     try {
       $flApi->post($url, $params);
