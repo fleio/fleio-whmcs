@@ -71,6 +71,27 @@ class Fleio {
         return $response['price'];
     }
 
+    public function updateServiceExternalBillingId($newServiceExtBillingId, $clientUUID=NULL) {
+        if ($clientUUID === NULL) {
+            $clientUUID = $this->clientsdetails->uuid;
+        }
+        $url = '/billing/services';
+        $response = $this->flApi->get($url, array("filtering"=>"client__external_billing_id:".$clientUUID."+product__product_type:openstack"));
+        if ($response === null) {
+            throw new FlApiRequestException("Unable to get service for client with uuid: " . $clientUUID, 404);
+        }
+        $responseObjects = $response["objects"];
+        if (sizeof($responseObjects)) {
+            $fleioServiceId = $responseObjects[0]["id"];
+            $serviceUrl = '/billing/services/'.$fleioServiceId;
+            try {
+                $this->flApi->patch($serviceUrl, array("external_billing_id" => $newServiceExtBillingId));
+            } catch (Exception $e) { 
+                echo ''.$e->getMessage(); 
+            }
+        }
+    }
+
     public function createBillingClient($groups, $serviceId=NULL) {
         $url = '/clients';
         $currency = getCurrency();
