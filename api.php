@@ -93,58 +93,152 @@ class Fleio {
     }
 
     public function createBillingClient($groups, $serviceId=NULL) {
-        $url = '/clients';
-        $currency = getCurrency();
-        $clientUsername = $this->SERVER->userPrefix ? $this->SERVER->userPrefix . $this->clientsdetails->userid : 'whmcs' . $this->clientsdetails->userid;
-        $user = array("username" => $clientUsername,
-                      "email" => $this->clientsdetails->email,
-                      "email_verified" => true,
-                      "first_name" => $this->clientsdetails->firstname,
-                      "last_name" => $this->clientsdetails->lastname,
-                      "password" => $this->generatePassword(16),
-                      "external_billing_id" => $this->clientsdetails->uuid);
-
-        $client = array('first_name' => $this->clientsdetails->firstname,
-                        'last_name' => $this->clientsdetails->lastname,
-                        'company' => $this->clientsdetails->companyname,
-                        'address1' => $this->clientsdetails->address1,
-                        'address2' => $this->clientsdetails->address2,
-                        'city' => $this->clientsdetails->city,
-                        'state' => $this->clientsdetails->state,
-                        'country' => $this->clientsdetails->countrycode,
-                        'zip_code' => $this->clientsdetails->postcode,
-                        'phone' => $this->clientsdetails->phonenumber,
-                        'fax' => $this->clientsdetails->fax,
-                        'email' => $this->clientsdetails->email,
-                        'external_billing_id' => $this->clientsdetails->uuid,
-                        'currency' => $currency['code'],
-                        'user' => $user,
-                        'create_auto_order_service' => true);
-
-        $cbset = $this->SERVER->ClientConfiguration;
-		if (!empty($cbset)) {
-			$client['configuration'] = $cbset;
-		};
-        if (!empty($groups) && trim($groups) != '') {
-            $client_groups = array_map('trim', explode(',', $groups, 10));
-            $client['groups'] = $client_groups;
-        };
-        # Set the username to display in Products/Services in WHMCS Admin
-        if ($serviceId) {
-          try {
-            Capsule::table( 'tblhosting' )
-                  ->where( 'id', '=', $serviceId )
-                  ->update(['username' => $clientUsername, 'password' => encrypt('set-in-fleio')]);
-          } catch (Exception $e) { logActivity('Unable to set the Fleio username in WHMCS: '. $e->getMessage()); }
+        try {
+            $existentClient = $this->getClient();
+        } catch (Exception $e) {
+            $existentClient = NULL;
         }
-        return $this->flApi->post($url, $client);
+        if ($existentClient === NULL) {
+            // Create client with auto order service
+            $url = '/clients';
+            $currency = getCurrency();
+            $clientUsername = $this->SERVER->userPrefix ? $this->SERVER->userPrefix . $this->clientsdetails->userid : 'whmcs' . $this->clientsdetails->userid;
+            $user = array("username" => $clientUsername,
+                          "email" => $this->clientsdetails->email,
+                          "email_verified" => true,
+                          "first_name" => $this->clientsdetails->firstname,
+                          "last_name" => $this->clientsdetails->lastname,
+                          "password" => $this->generatePassword(16),
+                          "external_billing_id" => $this->clientsdetails->uuid);
+
+            $client = array('first_name' => $this->clientsdetails->firstname,
+                            'last_name' => $this->clientsdetails->lastname,
+                            'company' => $this->clientsdetails->companyname,
+                            'address1' => $this->clientsdetails->address1,
+                            'address2' => $this->clientsdetails->address2,
+                            'city' => $this->clientsdetails->city,
+                            'state' => $this->clientsdetails->state,
+                            'country' => $this->clientsdetails->countrycode,
+                            'zip_code' => $this->clientsdetails->postcode,
+                            'phone' => $this->clientsdetails->phonenumber,
+                            'fax' => $this->clientsdetails->fax,
+                            'email' => $this->clientsdetails->email,
+                            'external_billing_id' => $this->clientsdetails->uuid,
+                            'auto_order_service_external_billing_id' => $serviceId, // send service external billing id, available only from fleio version 2019.09
+                            'currency' => $currency['code'],
+                            'user' => $user,
+                            'create_auto_order_service' => true);
+
+            $cbset = $this->SERVER->ClientConfiguration;
+    		if (!empty($cbset)) {
+    			$client['configuration'] = $cbset;
+    		};
+            if (!empty($groups) && trim($groups) != '') {
+                $client_groups = array_map('trim', explode(',', $groups, 10));
+                $client['groups'] = $client_groups;
+            };
+            // Set the username to display in Products/Services in WHMCS Admin
+            if ($serviceId) {
+              try {
+                Capsule::table( 'tblhosting' )
+                      ->where( 'id', '=', $serviceId )
+                      ->update(['username' => $clientUsername, 'password' => encrypt('set-in-fleio')]);
+              } catch (Exception $e) { logActivity('Unable to set the Fleio username in WHMCS: '. $e->getMessage()); }
+            }
+            return $this->flApi->post($url, $client);
+        } else {
+            // Client already exists in fleio, update his fields and run activate on the targeted service, also resume client if necessary
+            // (will run create on service module only if service is not active)
+            $updatedDetails = array("first_name" => $this->clientsdetails->firstname,
+                 "last_name" => $this->clientsdetails->lastname,
+                 "address1" => $this->clientsdetails->address1,
+                 "address2" => $this->clientsdetails->address2,
+                 "city" => $this->clientsdetails->city,
+                 "state" => $this->clientsdetails->state,
+                 "email" => $this->clientsdetails->email,
+                 "zip_code" => $this->clientsdetails->postcode,
+                 "country" => $this->clientsdetails->country,
+                 "company" => $this->clientsdetails->companyname,
+                 "phone" => $this->clientsdetails->phonenumber);
+            try {
+                // update client details
+                $this->updateFleioClient($updatedDetails);
+            } catch (Exception $e) {
+                logActivity('Could not update client ' . $this->clientdetails->uuid . ' details after running create on his existing service.');
+            }
+            // resume client if necessary
+            if ($existentClient["status"] !== "active") {
+                logActivity('Fleio: Resuming client ' . $this->clientdetails->uuid . ' before running create on his existing service.');
+                $fleio_client_id = $this->getClientId();
+                $url = '/clients/' . $fleio_client_id . '/resume';
+                try {
+                    $this->flApi->post($url);
+                } catch (Exception $e) {
+                    logActivity('Fleio: Could not resume client ' . $this->clientdetails->uuid . ' before running create on his existing service.');
+                }
+            }
+            // TODO: update user if necessary
+            // Resume user
+            try {
+                $relatedUser = $this->getUser();
+            } catch (Exception $e) {
+                $relatedUser = NULL;
+            }
+            if ($relatedUser !== NULL && !$relatedUser["is_active"]) {
+                try {
+                    $this->updateFleioUser($relatedUser["id"], array("is_active" => true));
+                } catch (Exception $e) {
+                    logActivity('Fleio: Could not re-activate user ' . $relatedUser["id"] . ' before running create on his existing service.');
+                }
+            }
+            // Run create on existing targeted service
+            $urlFleioService = '/billing/services';
+            try {
+                $response = $this->flApi->get($urlFleioService, array("filtering" => "external_billing_id:".$serviceId));
+            } catch (Exception $e) {
+                throw new FlApiRequestException('Fleio: unable to find service by external billing id ' . $serviceId . ' for activating it.', 404);
+            }
+            if ($response === null) {
+                throw new FlApiRequestException('Fleio: unable to find service by external billing id ' . $serviceId . ' for activating it.', 404);
+            }
+            $responseObjects = $response["objects"];
+            if (sizeof($responseObjects)) {
+                $fleioServiceId = $responseObjects[0]["id"];
+                $url = '/billing/services/' . $fleioServiceId . '/activate';
+                return $this->flApi->post($url);
+            }
+        }
     }
 
     public function updateFleioClient($details) {
         // Update the Fleio Client details
         $fleioClientId = $this->getClientId();
         $url = '/clients/'.$fleioClientId;
+        return $this->flApi->post($url, $details);
+    }
+
+    public function updateFleioUser($fleioUserId, $details) {
+        // Update the Fleio user details
+        $url = '/users/'.$fleioUserId;
         return $this->flApi->patch($url, $details);
+    }
+
+    public function getUser() {
+        $clientUsername = $this->SERVER->userPrefix ? $this->SERVER->userPrefix . $this->clientsdetails->userid : 'whmcs' . $this->clientsdetails->userid;
+        $url = '/users';
+        $query_params = array('username' => $clientUsername);
+        $response = $this->flApi->get($url, $query_params);
+        if ($response == null) {
+            throw new FlApiRequestException("Unable to retrieve the Fleio user with username: " . $clientUsername, 400);
+        }
+        $objects = $response['objects'];
+        if (count($objects) > 1) {
+            throw new FlApiRequestException("Unable to retrieve the Fleio user with username: " . $clientUsername, 409); // Multiple objects returned
+        }
+        if (count($objects) == 0) {
+           throw new FlApiRequestException("Unable to retrieve the Fleio user with username: " . $clientUsername, 404); // Not found
+        }
+        return $objects[0];
     }
 
     public function getClient() {
@@ -187,22 +281,148 @@ class Fleio {
         return  $url . $send_params;
     }
 
-    public function suspendOpenstack() {
-        $fleio_client_id = $this->getClientId();
-        $url = '/clients/' . $fleio_client_id . '/suspend';
-        return $this->flApi->post($url);
+    public function suspendOpenstack($serviceId) {
+        // get fleio service id and run suspend on fleio service
+        $urlFleioService = '/billing/services';
+        try {
+            $response = $this->flApi->get($urlFleioService, array("filtering" => "external_billing_id:".$serviceId));
+        } catch (Exception $e) {
+            throw new FlApiRequestException('Fleio: unable to find service by external billing id ' . $serviceId . ' for suspension.', 404);
+        }
+        if ($response === null) {
+            throw new FlApiRequestException('Fleio: unable to find service by external billing id ' . $serviceId . ' for suspension.', 404);
+        }
+        $responseObjects = $response["objects"];
+        if (sizeof($responseObjects)) {
+            $fleioServiceId = $responseObjects[0]["id"];
+            $url = '/billing/services/' . $fleioServiceId . '/suspend';
+            $this->flApi->post($url);
+        }
+        // If client does not have any other active service, suspend client
+        try {
+            $otherServicesResponse = $this->flApi->get($urlFleioService, array(
+                "filtering" => "client__external_billing_id:".$this->clientsdetails->uuid."+id__ne:".$fleioServiceId
+            ));
+        } catch (Exception $e) {
+            $otherServicesResponse = NULL;
+        }
+        $otherActiveServicesCount = 0;
+        if ($otherServicesResponse) {
+            $otherServicesResponseObjects = $otherServicesResponse["objects"];
+            if (sizeof($otherServicesResponseObjects)) {
+                for($i = 0 ; $i < sizeof($otherServicesResponseObjects); $i++) {
+                    if ($otherServicesResponseObjects[$i]["status"] !== "terminated" && $otherServicesResponseObjects[$i]["status"] !== "suspended") {
+                        $otherActiveServicesCount = $otherActiveServicesCount + 1;
+                    }
+                }
+            }
+        }
+        if ($otherActiveServicesCount === 0) {
+            // suspend client
+            $fleio_client_id = $this->getClientId();
+            $url = '/clients/' . $fleio_client_id . '/suspend';
+            try {
+                $this->flApi->post($url);
+            } catch (Exception $e) {
+                // do nothing
+            }
+        }
     }
 
-    public function resumeOpenstack() {
-        $fleio_client_id = $this->getClientId();
-        $url = '/clients/' . $fleio_client_id . '/resume';
-        return $this->flApi->post($url);
+    public function resumeOpenstack($serviceId) {
+        // get fleio service id and run resume on fleio service
+        $urlFleioService = '/billing/services';
+        try {
+            $response = $this->flApi->get($urlFleioService, array("filtering" => "external_billing_id:".$serviceId));
+        } catch (Exception $e) {
+            throw new FlApiRequestException('Fleio: unable to find service by external billing id ' . $serviceId . ' for resuming it.', 404);
+        }
+        if ($response === null) {
+            throw new FlApiRequestException('Fleio: unable to find service by external billing id ' . $serviceId . ' for resuming it.', 404);
+        }
+        $responseObjects = $response["objects"];
+        if (sizeof($responseObjects)) {
+            $fleioServiceId = $responseObjects[0]["id"];
+            $url = '/billing/services/' . $fleioServiceId . '/resume';
+            $this->flApi->post($url);
+        }
+        // if client is suspended, also run resume on client
+        try {
+            $fleioClient = $this->getClient();
+        } catch (Exception $e) {
+            $fleioClient = NULL;
+        }
+        if ($fleioClient !== NULL) {
+            if ($fleioClient["status"] === "suspended") {
+                $url = '/clients/' . $fleioClient["id"] . '/resume';
+                try {
+                    $this->flApi->post($url);
+                } catch (Exception $e) {
+                    // do nothing
+                }
+            }
+        }
     }
 
-    public function terminateOpenstack() {
-        $fleio_client_id = $this->getClientId();
-        $url = '/clients/' . $fleio_client_id . '?delete_cloud_resources=true';
-        return $this->flApi->delete($url);
+    public function terminateOpenstack($serviceId) {
+        // get fleio service id
+        $urlFleioService = '/billing/services';
+        try {
+            $response = $this->flApi->get($urlFleioService, array("filtering" => "external_billing_id:".$serviceId));
+        } catch (Exception $e) {
+            throw new FlApiRequestException('Fleio: unable to find service by external billing id ' . $serviceId . ' for termination.', 404);
+        }
+        if ($response === null) {
+            throw new FlApiRequestException('Fleio: unable to find service by external billing id ' . $serviceId . ' for termination.', 404);
+        }
+        $responseObjects = $response["objects"];
+        if (sizeof($responseObjects)) {
+            $fleioServiceId = $responseObjects[0]["id"];
+            $url = '/billing/services/' . $fleioServiceId . '/terminate';
+            $this->flApi->post($url);
+        }
+        // If client does not have any other active service, suspend client and de-activate fleio user
+        try {
+            $otherServicesResponse = $this->flApi->get($urlFleioService, array(
+                "filtering" => "client__external_billing_id:".$this->clientsdetails->uuid."+id__ne:".$fleioServiceId
+            ));
+        } catch (Exception $e) {
+            $otherServicesResponse = NULL;
+        }
+        $otherActiveServicesCount = 0;
+        if ($otherServicesResponse) {
+            $otherServicesResponseObjects = $otherServicesResponse["objects"];
+            if (sizeof($otherServicesResponseObjects)) {
+                for($i = 0 ; $i < sizeof($otherServicesResponseObjects); $i++) {
+                    if ($otherServicesResponseObjects[$i]["status"] !== "terminated" && $otherServicesResponseObjects[$i]["status"] !== "suspended") {
+                        $otherActiveServicesCount = $otherActiveServicesCount + 1;
+                    }
+                }
+            }
+        }
+        if ($otherActiveServicesCount === 0) {
+            // suspend client
+            $fleio_client_id = $this->getClientId();
+            $url = '/clients/' . $fleio_client_id . '/suspend';
+            try {
+                $this->flApi->post($url);
+            } catch (Exception $e) {
+                // do nothing
+            }
+            // de-activate user
+            try {
+                $relatedUser = $this->getUser();
+            } catch (Exception $e) {
+                $relatedUser = NULL;
+            }
+            if ($relatedUser !== NULL && $relatedUser["is_active"]) {
+                try {
+                    $this->updateFleioUser($relatedUser["id"], array("is_active" => false));
+                } catch (Exception $e) {
+                    // do nothing
+                }
+            }
+        }
     }
 
     public function clientChangeCredit($addCredit, $amount, $currencyCode, $currencyRate, $clientAmount, $clientCurrency, $invoiceId='') {

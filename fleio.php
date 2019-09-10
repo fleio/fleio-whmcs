@@ -130,9 +130,9 @@ function fleio_CreateAccount($params){
 }
 
 function fleio_SuspendAccount($params) {
-    $fl = Fleio::fromParams( $params );
+    $fl = Fleio::fromParams($params);
     try {
-        $result = $fl->suspendOpenstack();
+        $result = $fl->suspendOpenstack($params['serviceid']);
     } catch (FlApiException $e) {
         return $e->getMessage();
     }
@@ -140,9 +140,9 @@ function fleio_SuspendAccount($params) {
 }
 
 function fleio_UnsuspendAccount($params) {
-    $fl = Fleio::fromParams( $params );
+    $fl = Fleio::fromParams($params);
     try {
-        $result = $fl->resumeOpenstack();
+        $result = $fl->resumeOpenstack($params['serviceid']);
     } catch (FlApiException $e) {
         return $e->getMessage();
     }
@@ -152,7 +152,7 @@ function fleio_UnsuspendAccount($params) {
 function fleio_TerminateAccount($params) {
     $fl = Fleio::fromParams($params);
     try {
-        $result = $fl->terminateOpenstack();
+        $result = $fl->terminateOpenstack($params['serviceid']);
     } catch (FlApiException $e) {
         return ($e->getMessage());
     }
