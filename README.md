@@ -7,11 +7,13 @@ Fleio is an OpenStack billing system and self-service portal software that
 enables service providers to sell public cloud services.
 
 
+## Requirements
+* WHMCS 7.x
+* Requires PHP 7.x
+
 
 ## Installation
 
-
-**Requires WHMCS 7.x**
 
 1. Copy the source files to the WHMCS installation directory in `modules/servers/fleio`
 2. Move `WHMCS_INSTALL_DIR/modules/servers/fleio/fleioaddcredit.php` to `WHMCS_INSTALL_DIR/fleioaddcredit.php`
