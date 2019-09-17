@@ -64,15 +64,23 @@ foreach($whmcsClients AS $whmcsClient) {
                 echo "Cannot process services for client " . $whmcsClient->id . " : More than one active service found\n";
         } else if ($servicesStatusesCountMap["Active"]["count"] == 1) {
                 // if only one active, update it in fleio
-                $flApi = Fleio::fromServiceId($servicesStatusesCountMap["Active"]["id_list"][0]);
-                $flApi->updateServiceExternalBillingId($servicesStatusesCountMap["Active"]["id_list"][0], $whmcsClient->uuid);
+                try {
+                        $flApi = Fleio::fromServiceId($servicesStatusesCountMap["Active"]["id_list"][0]);
+                        $flApi->updateServiceExternalBillingId($servicesStatusesCountMap["Active"]["id_list"][0], $whmcsClient->uuid);
+                } catch (Exception $e) { 
+                        echo ''.$e->getMessage(); 
+                }
         } else if ($servicesStatusesCountMap["Suspended"]["count"] > 1) {
                 // if none active found and multiple suspended found, we cannot determine
                 echo "Cannot process services for client " . $whmcsClient->id . " : More than one suspended service found and none active\n";
         } else if ($servicesStatusesCountMap["Suspended"]["count"] == 1) {
                 // if none active but one suspended set it
-                $flApi = Fleio::fromServiceId($servicesStatusesCountMap["Suspended"]["id_list"][0]);
-                $flApi->updateServiceExternalBillingId($servicesStatusesCountMap["Suspended"]["id_list"][0], $whmcsClient->uuid);
+                try {
+                        $flApi = Fleio::fromServiceId($servicesStatusesCountMap["Suspended"]["id_list"][0]);
+                        $flApi->updateServiceExternalBillingId($servicesStatusesCountMap["Suspended"]["id_list"][0], $whmcsClient->uuid);
+                } catch (Exception $e) { 
+                        echo ''.$e->getMessage(); 
+                }
         } else if ($servicesStatusesCountMap["Terminated"]["count"] > 0 && $servicesStatusesCountMap["Cancelled"]["count"] > 0) {
                 // if none active or suspended but at least one terminated and cancelled, we cannot determine
                 echo "Cannot process services for client " . $whmcsClient->id . " : Has no active or suspended service and has at least one terminated and at least one cancelled service.\n";
@@ -84,19 +92,31 @@ foreach($whmcsClients AS $whmcsClient) {
                 echo "Cannot process services for client " . $whmcsClient->id . " : Has no active, suspended or terminated service and has multiple cancelled services.\n";
         } else if ($servicesStatusesCountMap["Cancelled"]["count"] == 1) {
                 // if no other status than one of cancelled (excluding pending), update it in fleio
-                $flApi = Fleio::fromServiceId($servicesStatusesCountMap["Cancelled"]["id_list"][0]);
-                $flApi->updateServiceExternalBillingId($servicesStatusesCountMap["Cancelled"]["id_list"][0], $whmcsClient->uuid);
+                try {
+                        $flApi = Fleio::fromServiceId($servicesStatusesCountMap["Cancelled"]["id_list"][0]);
+                        $flApi->updateServiceExternalBillingId($servicesStatusesCountMap["Cancelled"]["id_list"][0], $whmcsClient->uuid);
+                } catch (Exception $e) { 
+                        echo ''.$e->getMessage(); 
+                }
         } else if ($servicesStatusesCountMap["Terminated"]["count"] == 1) {
                 // if no other status than one of terminated (excluding pending), update it in fleio
-                $flApi = Fleio::fromServiceId($servicesStatusesCountMap["Terminated"]["id_list"][0]);
-                $flApi->updateServiceExternalBillingId($servicesStatusesCountMap["Terminated"]["id_list"][0], $whmcsClient->uuid);
+                try {
+                        $flApi = Fleio::fromServiceId($servicesStatusesCountMap["Terminated"]["id_list"][0]);
+                        $flApi->updateServiceExternalBillingId($servicesStatusesCountMap["Terminated"]["id_list"][0], $whmcsClient->uuid);
+                } catch (Exception $e) { 
+                        echo ''.$e->getMessage(); 
+                }
         } else if ($servicesStatusesCountMap["Fraud"]["count"] > 1) {
                 // if none active, suspended, terminated or cancelled but multiple fraud we cannot determine
                 echo "Cannot process services for client " . $whmcsClient->id . " : Has no active, suspended, terminated or cancelled services and has multiple fraud services.\n";
         } else if ($servicesStatusesCountMap["Fraud"]["count"] == 1) {
                 // if no other status than one of fraud (excluding pending), update it in fleio
-                $flApi = Fleio::fromServiceId($servicesStatusesCountMap["Fraud"]["id_list"][0]);
-                $flApi->updateServiceExternalBillingId($servicesStatusesCountMap["Fraud"]["id_list"][0], $whmcsClient->uuid);
+                try {
+                        $flApi = Fleio::fromServiceId($servicesStatusesCountMap["Fraud"]["id_list"][0]);
+                        $flApi->updateServiceExternalBillingId($servicesStatusesCountMap["Fraud"]["id_list"][0], $whmcsClient->uuid);
+                } catch (Exception $e) { 
+                        echo ''.$e->getMessage(); 
+                }
         }
 }
 echo 'Processed services count: '.$processedServices;
