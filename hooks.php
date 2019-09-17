@@ -20,6 +20,7 @@ add_hook("InvoiceCreation", 99, "fleio_update_invoice_hook");
 add_hook("ClientEdit", 99, "fleio_client_edit");
 //add_hook("DailyCronJob", 99, "fleio_PostCronjob");
 add_hook("AfterCronJob", 99, "fleio_PostCronjob");
+add_hook("ShoppingCartValidateCheckout", 1, "limitOrders");
 
 function fleio_PostCronjob() {
     // Retrieve a list of all Fleio Clients that have external billing set and have reached their credit limit or have 
@@ -458,3 +459,17 @@ function fleio_client_edit($vars) {
     }
 }
 
+function limitOrders($vars) {
+    // doesn't let users order more than one product of type fleio
+    if ($_SESSION['uid']) {
+        $otherServicesCount = Capsule::table('tblhosting')
+                            ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
+                            ->where('tblproducts.servertype', '=', 'fleio')
+                            ->where('tblhosting.userid', '=', $_SESSION['uid'])
+                            ->count();
+        if ($otherServicesCount > 0) {
+            global $errormessage;
+            $errormessage = "<li>Cloud products are limited to one per customer. Contact support if you need help.</li>";
+        }
+    }
+}
