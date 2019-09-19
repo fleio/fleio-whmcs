@@ -194,12 +194,13 @@ class Fleio {
             // Run create on existing targeted service
             $urlFleioService = '/billing/services';
             try {
-                $response = $this->flApi->get($urlFleioService, array("filtering" => "external_billing_id:".$serviceId));
+                $filteringString = "external_billing_id:" . $serviceId . "%2Bclient__external_billing_id:" . (string)$this->clientsdetails->uuid;
+                $response = $this->flApi->get($urlFleioService, array("filtering" => $filteringString));
             } catch (Exception $e) {
-                throw new FlApiRequestException('Fleio: unable to find service by external billing id ' . $serviceId . ' for activating it.', 404);
+                throw new FlApiRequestException('Fleio: unable to find service ' . $serviceId . ' for activating it. Check if client and service are tied through external_billing_id.', 404);
             }
             if ($response === null) {
-                throw new FlApiRequestException('Fleio: unable to find service by external billing id ' . $serviceId . ' for activating it.', 404);
+                throw new FlApiRequestException('Fleio: unable to find service ' . $serviceId . ' for activating it. Check if client and service are tied through external_billing_id.', 404);
             }
             $responseObjects = $response["objects"];
             if (sizeof($responseObjects)) {
@@ -285,12 +286,13 @@ class Fleio {
         // get fleio service id and run suspend on fleio service
         $urlFleioService = '/billing/services';
         try {
-            $response = $this->flApi->get($urlFleioService, array("filtering" => "external_billing_id:".$serviceId));
+            $filteringString = "external_billing_id:" . $serviceId . "%2Bclient__external_billing_id:" . (string)$this->clientsdetails->uuid;
+            $response = $this->flApi->get($urlFleioService, array("filtering" => $filteringString));
         } catch (Exception $e) {
-            throw new FlApiRequestException('Fleio: unable to find service by external billing id ' . $serviceId . ' for suspension.', 404);
+            throw new FlApiRequestException('Fleio: unable to find service ' . $serviceId . ' for suspension. Check if client and service are tied through external_billing_id', 404);
         }
         if ($response === null) {
-            throw new FlApiRequestException('Fleio: unable to find service by external billing id ' . $serviceId . ' for suspension.', 404);
+            throw new FlApiRequestException('Fleio: unable to find service ' . $serviceId . ' for suspension. Check if client and service are tied through external_billing_id', 404);
         }
         $responseObjects = $response["objects"];
         if (sizeof($responseObjects)) {
@@ -333,12 +335,13 @@ class Fleio {
         // get fleio service id and run resume on fleio service
         $urlFleioService = '/billing/services';
         try {
-            $response = $this->flApi->get($urlFleioService, array("filtering" => "external_billing_id:".$serviceId));
+            $filteringString = "external_billing_id:" . $serviceId . "%2Bclient__external_billing_id:" . (string)$this->clientsdetails->uuid;
+            $response = $this->flApi->get($urlFleioService, array("filtering" => $filteringString));
         } catch (Exception $e) {
-            throw new FlApiRequestException('Fleio: unable to find service by external billing id ' . $serviceId . ' for resuming it.', 404);
+            throw new FlApiRequestException('Fleio: unable to find service. ' . $serviceId . ' for resuming it. Check if client and service are tied through external_billing_id.', 404);
         }
         if ($response === null) {
-            throw new FlApiRequestException('Fleio: unable to find service by external billing id ' . $serviceId . ' for resuming it.', 404);
+            throw new FlApiRequestException('Fleio: unable to find service. ' . $serviceId . ' for resuming it. Check if client and service are tied through external_billing_id.', 404);
         }
         $responseObjects = $response["objects"];
         if (sizeof($responseObjects)) {
@@ -368,12 +371,13 @@ class Fleio {
         // get fleio service id
         $urlFleioService = '/billing/services';
         try {
-            $response = $this->flApi->get($urlFleioService, array("filtering" => "external_billing_id:".$serviceId));
+            $filteringString = "external_billing_id:" . $serviceId . "%2Bclient__external_billing_id:" . (string)$this->clientsdetails->uuid;
+            $response = $this->flApi->get($urlFleioService, array("filtering" => $filteringString));
         } catch (Exception $e) {
-            throw new FlApiRequestException('Fleio: unable to find service by external billing id ' . $serviceId . ' for termination.', 404);
+            throw new FlApiRequestException('Fleio: unable to find service ' . $serviceId . ' for termination. Check if client and service are tied through external_billing_id.', 404);
         }
         if ($response === null) {
-            throw new FlApiRequestException('Fleio: unable to find service by external billing id ' . $serviceId . ' for termination.', 404);
+            throw new FlApiRequestException('Fleio: unable to find service ' . $serviceId . ' for termination. Check if client and service are tied through external_billing_id.', 404);
         }
         $responseObjects = $response["objects"];
         if (sizeof($responseObjects)) {
