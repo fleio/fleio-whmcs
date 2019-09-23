@@ -460,15 +460,24 @@ function fleio_client_edit($vars) {
 
 function limitOrders($vars) {
     // doesn't let users order more than one product of type fleio
-    if ($_SESSION['uid']) {
-        $otherServicesCount = Capsule::table('tblhosting')
-                            ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
-                            ->where('tblproducts.servertype', '=', 'fleio')
-                            ->where('tblhosting.userid', '=', $_SESSION['uid'])
-                            ->count();
-        if ($otherServicesCount > 0) {
-            global $errormessage;
-            $errormessage = "<li>Cloud products are limited to one per customer. Contact support if you need help.</li>";
+    $productsInCart = $_SESSION['cart']['products'];
+    foreach ($productsInCart as $product) {
+        $dbProduct = Capsule::table('tblproducts')
+                        ->select('tblproducts.servertype')
+                        ->where('tblproducts.id', '=', $product['pid'])
+                        ->first();
+        if ($dbProduct->servertype === 'fleio') {
+            if ($_SESSION['uid']) {
+                $otherServicesCount = Capsule::table('tblhosting')
+                                    ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
+                                    ->where('tblproducts.servertype', '=', 'fleio')
+                                    ->where('tblhosting.userid', '=', $_SESSION['uid'])
+                                    ->count();
+                if ($otherServicesCount > 0) {
+                    global $errormessage;
+                    $errormessage = "<li>Cloud products are limited to one per customer. Contact support if you need help.</li>";
+                }
+            }
         }
     }
 }
