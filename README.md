@@ -147,6 +147,9 @@ To achieve this, you can set the product as free or set a one time payment requi
 It's really important to remember that when/if a WHMCS customer's currency is changed, the same operation needs to be done in Fleio and
 all Fleio client's services should be checked to have prices in the new currency set for the WHMCS client.
 
+If you're using the generate invoice feature of fleio-whmcs, automatic settlements and invoice generation settings have 
+to be disabled.
+
 License information
 ===================
 
