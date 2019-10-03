@@ -461,19 +461,35 @@ function fleio_client_edit($vars) {
 function limitOrders($vars) {
     // doesn't let users order more than one product of type fleio
     $productsInCart = $_SESSION['cart']['products'];
+    $fleioRelatedServicesInCart = 0;
     foreach ($productsInCart as $product) {
         $dbProduct = Capsule::table('tblproducts')
                         ->select('tblproducts.servertype')
                         ->where('tblproducts.id', '=', $product['pid'])
                         ->first();
         if ($dbProduct->servertype === 'fleio') {
+            $fleioRelatedServicesInCart = $fleioRelatedServicesInCart + 1;
+            if ($fleioRelatedServicesInCart > 1) {
+                global $errormessage;
+                $errormessage = "<li>Cloud products are limited to one per customer. Please remove other cloud products from cart.</li>";
+            }
             if ($_SESSION['uid']) {
-                $otherServicesCount = Capsule::table('tblhosting')
+                $otherServices = Capsule::table('tblhosting')
                                     ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
                                     ->where('tblproducts.servertype', '=', 'fleio')
                                     ->where('tblhosting.userid', '=', $_SESSION['uid'])
-                                    ->count();
-                if ($otherServicesCount > 0) {
+                                    ->select('tblhosting.domainstatus')
+                                    ->get();
+                $otherServicesCount = 0;
+                $otherServicesFraudCount = 0;
+                foreach ($otherServices as $otherFleioService) {
+                    $otherServicesCount = $otherServicesCount + 1;
+                    if ($otherFleioService->domainstatus === 'Fraud') {
+                        $otherServicesFraudCount = $otherServicesFraudCount + 1;
+                    }
+                }
+                if ($otherServicesCount > 0 && $otherServicesCount !== $otherServicesFraudCount) {
+                    // throw error if user has any other fleio related service that isn't marked as fraud
                     global $errormessage;
                     $errormessage = "<li>Cloud products are limited to one per customer. Contact support if you need help.</li>";
                 }
