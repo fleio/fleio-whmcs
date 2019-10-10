@@ -440,7 +440,8 @@ class Fleio {
     	                     'exchange_rate' => 1,
     	                     'source_amount' => $amount,
     	                     'source_currency' => $currencyCode,
-                             'add_credit' => $addCredit);
+                             'add_credit' => $addCredit,
+                             'external_source' => true);
     	     return $this->flApi->post($url, $params); 
    	        } catch (Exception $e) {
                if ($addCredit) {
