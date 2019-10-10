@@ -10,8 +10,7 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 use WHMCS\View\Menu\Item as MenuItem;
 
 add_hook("InvoicePaid", 99, "openstack_add_funds_hook", "");
-# add_hook("InvoiceUnpaid", 99, "openstack_del_credit_hook");  # disabled for now. Invoice can be Cancelled and marked Unpaid afterwards...
-# add_hook("InvoiceRefunded", 99, "openstack_del_credit_hook"); # disabled for now. Manual funds removal is necessary in Fleio.
+add_hook("InvoiceRefunded", 99, "openstack_del_credit_hook");
 add_hook("ClientAreaPrimarySidebar", 99, "fleio_ClientAreaPrimarySidebar");
 add_hook("ClientAreaPrimaryNavbar", 99, "fleio_ClientAreaPrimaryNavbar");
 add_hook("InvoiceCreation", 99, "fleio_update_invoice_hook");
@@ -326,7 +325,7 @@ function fleio_update_invoice_hook($vars) {
     }
 }
 
-function openstack_change_funds($invoiceid, $substract=False) {
+function openstack_change_funds($invoiceid, $subtract=false) {
     /*
     Check all invoice items and for each Fleio product, either add or
     remove credit based on the total item costs and the action performed.
@@ -334,7 +333,7 @@ function openstack_change_funds($invoiceid, $substract=False) {
     $items = Capsule::table('tblinvoiceitems')->where('invoiceid', '=', $invoiceid)->get();
 
     // Retrieve the invoice total paid.
-    // If this invoice was not fully paid, we do not substract from Fleio.
+    // If this invoice was not fully paid, we do not subtract from Fleio.
     // There is no other way to prevent subtracting from Fleio when cancelling an invoice and marking it unpaid afterwards
     try {
         $balance = Capsule::table('tblaccounts as ta')
@@ -393,16 +392,16 @@ function openstack_change_funds($invoiceid, $substract=False) {
                continue;
             }
             $fl = Fleio::fromServiceId($item->relid);
-            if ($substract) {
-                $msg_format = "Fleio: removing credit for WHMCS User ID: %s with %.02f %s (%.02f %s from Invoice ID: %s)";
-            } else {
-                $msg_format = "Fleio: adding credit for WHMCS User ID: %s with %.02f %s (%.02f %s from Invoice ID: %s)";
-            }
-            $msg = sprintf($msg_format, $item->userid, $amount, $defaultCurrency["code"], $clientAmount, $clientCurrency["code"], $invoiceid);
-            logActivity($msg);
             # TODO(tomo): We use the userid which can be a contact ?
             try {
-                $addCredit = (!$subtract);  // Add credit or subtract, boolean
+                $addCredit = !$subtract;  // Add credit or subtract, boolean
+                if ($addCredit) {
+                    $msg_format = "Fleio: adding credit for WHMCS User ID: %s with %.02f %s (%.02f %s from Invoice ID: %s)";
+                } else {
+                    $msg_format = "Fleio: removing credit for WHMCS User ID: %s with %.02f %s (%.02f %s from Invoice ID: %s)";
+                }
+                $msg = sprintf($msg_format, $item->userid, $amount, $defaultCurrency["code"], $clientAmount, $clientCurrency["code"], $invoiceid);
+                logActivity($msg);
                 $response = $fl->clientChangeCredit($addCredit, $amount, $defaultCurrency["code"], $clientCurrency["rate"], $clientAmount, $clientCurrency["code"], $invoiceid);
             } catch (FlApiException $e) {
                 logActivity("Unable to update the client credit in Fleio: " . $e->getMessage()); 
@@ -416,7 +415,7 @@ function openstack_change_funds($invoiceid, $substract=False) {
 
 function openstack_add_funds_hook($vars) { openstack_change_funds($vars["invoiceid"]); }
 
-function openstack_del_credit_hook($vars) { openstack_change_funds($vars["invoiceid"], True); }
+function openstack_del_credit_hook($vars) { openstack_change_funds($vars["invoiceid"], true); }
 
 function fleio_ClientAreaPrimarySidebar(MenuItem $pn) {
     $actionsNav = $pn->getChild("Service Details Actions");
