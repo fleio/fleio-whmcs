@@ -22,7 +22,7 @@ if ($ca->isLoggedIn()) {
         $prodId = Capsule::table('tblhosting')
                     ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
                     ->where('tblhosting.userid', '=', $ca->getUserID())
-                    ->where('tblhosting.domainstatus', '=', 'Active')
+                    ->whereIn('tblhosting.domainstatus', ['Active', 'Suspended'])
                     ->where('tblproducts.servertype', '=', 'fleio')
                     ->select('tblhosting.id')
                     ->first();
