@@ -190,8 +190,48 @@ class FleioUtils {
       }
     }
 
-    public static function clientHasBillingAgreement($gatewayid, $prefixes) {
-      // checks if client gatewayid is suitable for billing agreements based on it's prefix
+    public static function clientHasPaidFleioRelatedInvoice($clientId) {
+      $fleioServers = self::getFleioProducts();
+      foreach($fleioServers as $server) {
+        $clientProd = Capsule::table('tblhosting AS th')
+                     ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
+                     ->where('tp.id', '=', $server->id)
+                     ->where('th.userid', '=', $clientId)
+                     ->where('tp.servertype', '=', 'fleio')
+                     ->select('th.*')
+                     ->first();
+                     
+        if (!$clientProd) {
+          return false;
+        }
+
+        $invoiceItems = Capsule::table('tblinvoiceitems')
+                        ->join('tblclients AS tc', 'tc.id', '=', 'tblinvoiceitems.userid')
+                        ->join('tblhosting', 'tblinvoiceitems.relid', '=', 'tblhosting.id')
+                        ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
+                        ->where('tblinvoiceitems.userid', '=', $clientId)
+                        ->where('tblinvoiceitems.relid', '=', $clientProd->id)
+                        ->where('tblproducts.servertype', '=', 'fleio')
+                        ->select('tblinvoiceitems.invoiceid')
+                        ->get();
+
+        foreach($invoiceItems AS $invoiceItem) {
+                $invoice = Capsule::table('tblinvoices')
+                          ->where('id', '=', $invoiceItem->invoiceid)
+                          ->select('tblinvoices.status')
+                          ->first();
+                if ($invoice->status === 'Paid') {
+                  return true;
+                }
+        }
+        return false;
+      }
+      return false;
+    }
+
+    public static function clientHasBillingAgreement($clientId, $gatewayid, $prefixes) {
+      // checks if client gatewayid is suitable for billing agreements based on its prefix
+      // also checks if client has a fleio related invoice with status of paid
       $hasAgreement = false;
       $includeGatewaysWithPrefixArr = explode(',', $prefixes);
       if (isset($gatewayid) && !(is_null($gatewayid)) && !(empty($gatewayid))) {
@@ -205,6 +245,9 @@ class FleioUtils {
             }
           }
         }
+      }
+      if ($hasAgreement) {
+        $hasAgreement = self::clientHasPaidFleioRelatedInvoice($clientId);
       }
       return $hasAgreement;  
     }
@@ -256,7 +299,7 @@ class FleioUtils {
            }
         $agreements = [];
         foreach($clients AS $client) {   
-          $hasAgreement = self::clientHasBillingAgreement($client->gatewayid, $includeGatewaysWithPrefix);
+          $hasAgreement = self::clientHasBillingAgreement($client->id, $client->gatewayid, $includeGatewaysWithPrefix);
           if ($hasAgreement) {
             foreach(FleioUtils::$gateway_id_to_gateway_map AS $key => $gateway) {
               if (substr($client->gatewayid, 0, strlen($key)) === $key) {
