@@ -115,6 +115,13 @@ function fleio_ConfigOptions() {
         "Default" => "0",
         "Description" => "".$default_currency_code
     ),
+    "requiredHoursSinceLastPaidInvoice" => array (
+        "FriendlyName" => "Required hours since last paid invoice",
+        "Type" => "text",
+        "Size" => "5",
+        "Description" => "If hours since last paid invoice passes the number you define here, the related client will not be considered anymore as having a billing agreement. If you set this to zero, the setting is not taken into account.",
+        "Default" => "0",
+    ),
     );
     return $configarray;
 }
