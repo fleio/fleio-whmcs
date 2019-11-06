@@ -164,17 +164,22 @@ class Fleio {
                 // update client details
                 $this->updateFleioClient($updatedDetails);
             } catch (Exception $e) {
-                logActivity('Could not update client ' . $this->clientdetails->uuid . ' details after running create on his existing service.');
+                logActivity(
+                    'Could not update client ' . 
+                    $this->clientsdetails->uuid . 
+                    ' details after running create on his existing service. Reason: ' . 
+                    $e->getMessage()
+                );
             }
             // resume client if necessary
             if ($existentClient["status"] !== "active") {
-                logActivity('Fleio: Resuming client ' . $this->clientdetails->uuid . ' before running create on his existing service.');
+                logActivity('Fleio: Resuming client ' . $this->clientsdetails->uuid . ' before running create on his existing service.');
                 $fleio_client_id = $this->getClientId();
                 $url = '/clients/' . $fleio_client_id . '/resume';
                 try {
                     $this->flApi->post($url);
                 } catch (Exception $e) {
-                    logActivity('Fleio: Could not resume client ' . $this->clientdetails->uuid . ' before running create on his existing service.');
+                    logActivity('Fleio: Could not resume client ' . $this->clientsdetails->uuid . ' before running create on his existing service.');
                 }
             }
             // TODO: update user if necessary
@@ -207,6 +212,50 @@ class Fleio {
                 $fleioServiceId = $responseObjects[0]["id"];
                 $url = '/billing/services/' . $fleioServiceId . '/activate';
                 return $this->flApi->post($url);
+            } else {
+                // This service is not in fleio, check if user has another terminated one and create a new OS service if so (fleio supports at most 1 active/suspended service per client)
+                try {
+                    $filteringString = "client__external_billing_id:" . (string)$this->clientsdetails->uuid . "+product__product_type:openstack";
+                    $otherServicesResponse = $this->flApi->get($urlFleioService, array("filtering" => $filteringString));
+                } catch (Exception $e) {
+                    throw new FlApiRequestException('Fleio: unable to retrieve services.', 404);
+                }
+                $otherServicesObjects = $otherServicesResponse["objects"];
+                if (sizeof($otherServicesObjects)) {
+                    for($i = 0; $i < sizeof($otherServicesObjects); $i++) {
+                        if ($otherServicesObjects[$i]["status"] !== "terminated") {
+                            throw new FlApiRequestException(
+                                'Cannot create OS service in fleio. Only one active/suspended service is available for a client.'
+                            );
+                        }
+                    }
+                }
+                // get product data
+                $osClientsUrl = '/openstack/clients/';
+                $fleio_client_id = $this->getClientId();
+                try {
+                    $newServiceProductsResp = $this->flApi->get($osClientsUrl . $fleio_client_id . '/new_service_data', array());
+                    $newServiceProducts = $newServiceProductsResp["products"];
+                    $newServiceProductId = $newServiceProducts[0]["id"];
+                    $newServiceCycleId = $newServiceProducts[0]["cycles"][0]["id"];
+                } catch (Exception $e) {
+                    throw new FlApiRequestException(
+                        'Fleio: unable to retrieve products for new OS service. Reason: ' . (string)$e->getMessage(), 404
+                    );
+                }
+                // create new service
+                try {
+                    $this->flApi->post($osClientsUrl . $fleio_client_id . '/create_openstack_service', array(
+                        "product_id" => $newServiceProductId,
+                        "product_cycle_id" => $newServiceCycleId,
+                        "service_external_id" => $serviceId,
+                        "create_new_project" => true
+                    ));
+                } catch (Exception $e) {
+                    throw new FlApiRequestException(
+                        'Fleio: unable to create new OS service for client. Reason: ' . (string)$e->getMessage(), 400
+                    );
+                }
             }
         }
     }
@@ -215,7 +264,7 @@ class Fleio {
         // Update the Fleio Client details
         $fleioClientId = $this->getClientId();
         $url = '/clients/'.$fleioClientId;
-        return $this->flApi->post($url, $details);
+        return $this->flApi->patch($url, $details);
     }
 
     public function updateFleioUser($fleioUserId, $details) {
@@ -585,3 +634,4 @@ class FlApi {
         return $decoded_result;
     }
 }
+
