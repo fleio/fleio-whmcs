@@ -193,6 +193,14 @@ class FleioUtils {
     public static function clientHasPaidFleioRelatedInvoice($clientId) {
       $fleioServers = self::getFleioProducts();
       foreach($fleioServers as $server) {
+        $requiredHoursSinceLastPaidInvoice = $server->configoption15;
+        if ($requiredHoursSinceLastPaidInvoice === NULL) {
+          $requiredHoursSinceLastPaidInvoice = 0;
+        } else {
+          $requiredHoursSinceLastPaidInvoice = (int)$requiredHoursSinceLastPaidInvoice;
+        }
+        $maxDatePaid = NULL;
+
         $clientProd = Capsule::table('tblhosting AS th')
                      ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
                      ->where('tp.id', '=', $server->id)
@@ -218,11 +226,25 @@ class FleioUtils {
         foreach($invoiceItems AS $invoiceItem) {
                 $invoice = Capsule::table('tblinvoices')
                           ->where('id', '=', $invoiceItem->invoiceid)
-                          ->select('tblinvoices.status')
+                          ->select('tblinvoices.status', 'tblinvoices.datepaid')
                           ->first();
                 if ($invoice->status === 'Paid') {
-                  return true;
+                  if ($requiredHoursSinceLastPaidInvoice > 0) {
+                    $datePaid = $invoice->datepaid;
+                    if ($maxDatePaid === NULL || $datePaid > $maxDatePaid) {
+                      $maxDatePaid = $datePaid;
+                    }
+                  } else {
+                    return true;
+                  }
                 }
+        }
+        if ($requiredHoursSinceLastPaidInvoice > 0 && $maxDatePaid) {
+          $nowMinusHoursDefined = time() - (3600 * $requiredHoursSinceLastPaidInvoice);
+          $latestPaidInvoiceLimit = date("Y-m-d H:i:s", $nowMinusHoursDefined);
+          if ($maxDatePaid >= $latestPaidInvoiceLimit) {
+            return true;
+          }
         }
         return false;
       }
