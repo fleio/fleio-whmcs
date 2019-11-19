@@ -33,7 +33,14 @@ function fleio_PostCronjob() {
         logActivity('Fleio: Looking at clients with and without a billing agreement');
       };
       $flApi = new FlApi($server->configoption4, $server->configoption1);
-      FleioUtils::updateClientsBillingAgreement($flApi, 'Active', $server->configoption13);
+      FleioUtils::updateClientsBillingAgreement(
+        $flApi, 
+        'Active', 
+        $server->configoption13, 
+        $server->configoption15, 
+        $server->configoption16, 
+        $capturePaymentImmediately
+    );
       logActivity('Fleio: retrieving all overdue clients');
       $url = "/clients/over_credit_limit";
       $urlParams = array(
@@ -58,7 +65,11 @@ function fleio_PostCronjob() {
             try {
                 $clientFromUUID = FleioUtils::getUUIDClient($clientOl['external_billing_id']);
                 if ($clientFromUUID != NULL) {
-                    $clientHasBillingAgreement = FleioUtils::clientHasBillingAgreement($clientFromUUID->gatewayid, $server->configoption13);
+                    $clientHasBillingAgreement = FleioUtils::clientHasBillingAgreement(
+                        $clientFromUUID->id, 
+                        $clientFromUUID->gatewayid, 
+                        $server->configoption13
+                    );
                     $alreadyInvoicedAndUnpaid = FleioUtils::getFleioProductsInvoicedAmount($clientFromUUID->id, $server->id);
                     $fleioWhmcsService = $alreadyInvoicedAndUnpaid['product'];
                     $fleioWhmcsServiceId = $fleioWhmcsService->id;
@@ -88,7 +99,11 @@ function fleio_PostCronjob() {
                                 $numInvoicedClients += 1;
                                 FleioUtils::markBillingHistoriesAsInvoiced($flApi, $clientOl['external_billing_id']);
                                 if ($capturePaymentImmediately && $clientHasBillingAgreement) {
-                                    FleioUtils::captureInvoicePayment($invoiceId);
+                                    $captured = FleioUtils::captureInvoicePayment($invoiceId);
+                                    if ($captured === false && $server->configoption16 === '1') {
+                                        // capture failed and setting says the client is no more on agreement
+                                        FleioUtils::removeClientBillingAgreement($flApi, $clientOl['external_billing_id']);
+                                    }
                                 }
                                 continue;
                             }
@@ -104,7 +119,11 @@ function fleio_PostCronjob() {
                                 logActivity('Fleio: issued Invoice ID: '. $invoiceId .' for User ID: '. $clientFromUUID->id. ' for over credit limit of '. $amountUsedAndUninvoiced . ' ' . $alreadyInvoicedAndUnpaid["currency"]["code"]);
                                 $numInvoicedClients += 1;
                                 if ($capturePaymentImmediately && $clientHasBillingAgreement) {
-                                    FleioUtils::captureInvoicePayment($invoiceId);
+                                    $captured = FleioUtils::captureInvoicePayment($invoiceId);
+                                    if ($captured === false && $server->configoption16 === '1') {
+                                        // capture failed and setting says the client is no more on agreement
+                                        FleioUtils::removeClientBillingAgreement($flApi, $clientOl['external_billing_id']);
+                                    }
                                 }
                             }
                         }

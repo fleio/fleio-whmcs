@@ -115,11 +115,18 @@ function fleio_ConfigOptions() {
         "Default" => "0",
         "Description" => "".$default_currency_code
     ),
-    "requiredHoursSinceLastPaidInvoice" => array (
-        "FriendlyName" => "Required hours since last paid invoice",
+    "retryChargesEveryXHours" => array (
+        "FriendlyName" => "Retry auto charging invoice after defined time (hours)",
         "Type" => "text",
         "Size" => "5",
-        "Description" => "If hours since last paid invoice passes the number you define here, the related client will not be considered anymore as having a billing agreement. If you set this to zero, the setting is not taken into account.",
+        "Description" => "If an invoice is not paid automatically, retry every hours you define here. Leave 0 or blank to disable this option.",
+        "Default" => "0",
+    ),
+    "removeAgreementStatusAfterXFailedCharges" => array (
+        "FriendlyName" => "Remove on agreement status after defined number of failed charges (currently working with either 1 or 2).",
+        "Type" => "text",
+        "Size" => "1",
+        "Description" => "If an invoice belonging to a client on agreement is not successfully paid after a number of retries you define, he will not be considered on agreement anymore. The number of retries that will work is limited to 2. Choose either 1 or 2. Also, setting this to 2 does not make sense if you do not use the retry auto-charge setting.",
         "Default" => "0",
     ),
     );

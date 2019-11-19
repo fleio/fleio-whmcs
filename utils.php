@@ -193,14 +193,6 @@ class FleioUtils {
     public static function clientHasPaidFleioRelatedInvoice($clientId) {
       $fleioServers = self::getFleioProducts();
       foreach($fleioServers as $server) {
-        $requiredHoursSinceLastPaidInvoice = $server->configoption15;
-        if ($requiredHoursSinceLastPaidInvoice === NULL) {
-          $requiredHoursSinceLastPaidInvoice = 0;
-        } else {
-          $requiredHoursSinceLastPaidInvoice = (int)$requiredHoursSinceLastPaidInvoice;
-        }
-        $maxDatePaid = NULL;
-
         $clientProd = Capsule::table('tblhosting AS th')
                      ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
                      ->where('tp.id', '=', $server->id)
@@ -226,25 +218,11 @@ class FleioUtils {
         foreach($invoiceItems AS $invoiceItem) {
                 $invoice = Capsule::table('tblinvoices')
                           ->where('id', '=', $invoiceItem->invoiceid)
-                          ->select('tblinvoices.status', 'tblinvoices.datepaid')
+                          ->select('tblinvoices.status')
                           ->first();
                 if ($invoice->status === 'Paid') {
-                  if ($requiredHoursSinceLastPaidInvoice > 0) {
-                    $datePaid = $invoice->datepaid;
-                    if ($maxDatePaid === NULL || $datePaid > $maxDatePaid) {
-                      $maxDatePaid = $datePaid;
-                    }
-                  } else {
-                    return true;
-                  }
+                  return true;
                 }
-        }
-        if ($requiredHoursSinceLastPaidInvoice > 0 && $maxDatePaid) {
-          $nowMinusHoursDefined = time() - (3600 * $requiredHoursSinceLastPaidInvoice);
-          $latestPaidInvoiceLimit = date("Y-m-d H:i:s", $nowMinusHoursDefined);
-          if ($maxDatePaid >= $latestPaidInvoiceLimit) {
-            return true;
-          }
         }
         return false;
       }
@@ -306,7 +284,21 @@ class FleioUtils {
       return array("amount" => $amount, "currency" => $clientCurrency, "product" => $fleioProduct, 'days_since_last_invoice' => $daysSinceLastInvoice);
     }
 
-  public static function updateClientsBillingAgreement($flApi, $status='Active', $includeGatewaysWithPrefix='') {
+  public static function removeClientBillingAgreement($flApi, $clientExternalBillingId) {
+    $agreements = [];
+    $clientAgreement = array("uuid" => $clientExternalBillingId, "agreement" => false);
+    array_push($agreements, $clientAgreement);
+    if (sizeof($agreements)) {
+      $url = '/clients/set_billing_agreements';
+      try {
+        $flApi->post($url, $agreements);
+      } catch (Exception $e) {
+        logActivity('Fleio update billing agreements FAIL: '. $e->getMessage());
+      }
+    }
+  }
+
+  public static function updateClientsBillingAgreement($flApi, $status='Active', $includeGatewaysWithPrefix='', $retryChargesEveryXHours='0', $removeAgreementStatusAfterXFailedCharges='0', $capturePaymentImmediately) {
     logActivity('Fleio: update all clients billing agreements');
        try {
             $clients = Capsule::table('tblhosting AS th')
@@ -329,6 +321,72 @@ class FleioUtils {
                 break;
               }
             };
+          }
+          if ($hasAgreement === true && $capturePaymentImmediately) {
+            // Further check if client really is on agreement. Retry charges for his unpaid invoices if this setting is active,
+            // Remove agreement status if auto-pay failed x times (defined in module settings)
+            if ($retryChargesEveryXHours !== NULL && $retryChargesEveryXHours !== '0' && $retryChargesEveryXHours !== '') {
+              $fleioServers = self::getFleioProducts();
+              foreach($fleioServers as $server) {
+                $clientProd = Capsule::table('tblhosting AS th')
+                             ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
+                             ->where('tp.id', '=', $server->id)
+                             ->where('th.domainstatus', '=', 'Active')
+                             ->where('th.userid', '=', $client->id)
+                             ->where('tp.servertype', '=', 'fleio')
+                             ->select('th.*')
+                             ->first();
+                             
+                if ($clientProd) {
+                  $invoiceItems = Capsule::table('tblinvoiceitems')
+                                ->join('tblclients AS tc', 'tc.id', '=', 'tblinvoiceitems.userid')
+                                ->join('tblhosting', 'tblinvoiceitems.relid', '=', 'tblhosting.id')
+                                ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
+                                ->where('tblinvoiceitems.userid', '=', $client->id)
+                                ->where('tblinvoiceitems.relid', '=', $clientProd->id)
+                                ->where('tblproducts.servertype', '=', 'fleio')
+                                ->select('tblinvoiceitems.invoiceid')
+                                ->get();
+
+                  foreach($invoiceItems AS $invoiceItem) {
+                    $invoice = Capsule::table('tblinvoices')
+                              ->where('id', '=', $invoiceItem->invoiceid)
+                              ->select('tblinvoices.status', 'tblinvoices.id', 'tblinvoices.last_capture_attempt')
+                              ->first();
+                    if ($invoice && $invoice->status === 'Unpaid') {
+                      if ($invoice->last_capture_attempt === '0000-00-00 00:00:00') {
+                        $captured = self::captureInvoicePayment($invoice->id);
+                        if ($captured === false && $removeAgreementStatusAfterXFailedCharges === '1') {
+                          $hasAgreement = false;
+                          break;
+                        }
+                      } else {
+                        if ($removeAgreementStatusAfterXFailedCharges === '1' || $invoice->last_capture_attempt === '2000-01-01 00:00:00') {
+                          // if last capture attempt is set to '2000-01-01 00:00:00' it means this already failed the second time and 
+                          // agreement removal was set at 2
+                          $hasAgreement = false;
+                          break;
+                        }
+                        $secondsPassedSinceLastCaptureAttempt = time() - strtotime($invoice->last_capture_attempt);
+                        $hoursSinceLastCaptureAttempt = floor($secondsPassedSinceLastCaptureAttempt / 3600);
+                        if ($hoursSinceLastCaptureAttempt >= (int)$retryChargesEveryXHours) {
+                          // Retry payment. If this fails again, set last_capture_attempt to now and retry in a future time if needed.
+                          $captured = self::captureInvoicePayment($invoice->id);
+                          if ($captured === false && $removeAgreementStatusAfterXFailedCharges === '2') {
+                            $hasAgreement = false;
+                            Capsule::table('tblinvoices')
+                            ->where('id', '=', $invoice->id)
+                            ->update(['last_capture_attempt' => date("Y-m-d H:i:s", strtotime('2000-01-01 00:00:00'))]);
+                            // set this date so we know it failed at least the second time
+                            break;
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
           $clientAgreement = array("uuid" => $client->uuid, "agreement" => $hasAgreement);
           array_push($agreements, $clientAgreement);
@@ -360,10 +418,22 @@ class FleioUtils {
       $result = localAPI('CapturePayment', $data);
       if (is_array($result) && $result['result'] != 'success') {
           $captureMessage = $result['message'];
+          try {
+            // payment failed, set the last capture attempt for this invoice
+            Capsule::table('tblinvoices')
+            ->where('id', '=', $invoiceId)
+            ->update(['last_capture_attempt' => date("Y-m-d H:i:s", time())]);
+          } catch (Exception $e) {
+            logActivity('Could not set last capture attempt for invoice ' . $invoiceId . '. Reason: ' . $e->getMessage());
+          }
+          logActivity('Fleio: capture Invoice ID: '. $invoiceId .' '.$captureMessage);
+          return false;
       } else {
           $captureMessage = 'Captured successfully';
+          logActivity('Fleio: capture Invoice ID: '. $invoiceId .' '.$captureMessage);
+          return true;
       }
-      logActivity('Fleio: capture Invoice ID: '. $invoiceId .' '.$captureMessage);
+      return false;
   }
   public static function getClientPaymentMethod($clientId) {
         try {
