@@ -8,9 +8,9 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 use WHMCS\Module\Queue as ModuleQueue;
 
 class FleioUtils {
-    private static $gateway_id_to_gateway_map = array(
-      'B-' => 'paypalbilling',
-      'cus_' => 'stripe'
+    private static $gateway_name_prefix_to_gateway_map = array(
+      'paypal' => 'paypalbilling',
+      'stripe' => 'stripe'
     );
 
     public function __construct(){}
@@ -229,27 +229,53 @@ class FleioUtils {
       return false;
     }
 
-    public static function clientHasBillingAgreement($clientId, $gatewayid, $prefixes) {
-      // checks if client gatewayid is suitable for billing agreements based on its prefix
+    public static function autoPayConsidered($gatewayName, $validNames) {
+        $isConsidered = false;
+        if (!$gatewayName || is_null($gatewayName) || empty($gatewayName)) {
+            return $isConsidered;
+        }
+        if (trim($validNames) == '') {
+            $isConsidered = true;
+        } else {
+            $includeGatewaysWithNameArr = explode(',', $validNames);
+            foreach($includeGatewaysWithNameArr AS $validName) {
+                $validName = trim($validName); // remove whitespaces if they exist
+                if ($validName &&
+                    strpos($gatewayName, $validName) === 0) {
+                    $isConsidered = true;
+                }
+            }
+        }
+        return $isConsidered;
+    }
+
+    public static function clientHasBillingAgreement($clientId, $validGatewayNames) {
+      // checks if client payment method is suitable for billing agreements based on its gateway name
       // also checks if client has a fleio related invoice with status of paid
       $hasAgreement = false;
-      $includeGatewaysWithPrefixArr = explode(',', $prefixes);
-      if (isset($gatewayid) && !(is_null($gatewayid)) && !(empty($gatewayid))) {
-        if (trim($prefixes) == '') {
-          $hasAgreement = true;
-        } else {
-          foreach($includeGatewaysWithPrefixArr AS $validPrefix) {
-            $validPrefix = trim($validPrefix); // remove whitespaces if they exist
-            if ($validPrefix && strpos($gatewayid, $validPrefix) === 0) {
-              $hasAgreement = true;
-            }
+      $gatewayNames = array();
+      $payMethods = localAPI('GetPayMethods', array('clientid' => $clientId));
+      if ($payMethods && $payMethods['paymethods']) {
+          if (sizeof($payMethods['paymethods'])) {
+              foreach($payMethods['paymethods'] AS $payMethod) {
+                  if ($payMethod['remote_token'] && !(is_null($payMethod['remote_token']))
+                      && !(empty($payMethod['remote_token']))) {
+                      $payMethodHasAgreement = self::autoPayConsidered(
+                          $payMethod['gateway_name'],
+                          $validGatewayNames
+                      );
+                      if ($payMethodHasAgreement) {
+                          $hasAgreement = true;
+                          array_push($gatewayNames, $payMethod['gateway_name']);
+                      }
+                  }
+              }
           }
-        }
       }
       if ($hasAgreement) {
         $hasAgreement = self::clientHasPaidFleioRelatedInvoice($clientId);
       }
-      return $hasAgreement;  
+      return array('hasAgreement' => $hasAgreement, 'gatewayNames' => $gatewayNames);
     }
 
     public static function getFleioProductsInvoicedAmount($clientId, $fleioPackageId) {
@@ -298,7 +324,7 @@ class FleioUtils {
     }
   }
 
-  public static function updateClientsBillingAgreement($flApi, $status='Active', $includeGatewaysWithPrefix='', $retryChargesEveryXHours='0', $removeAgreementStatusAfterXFailedCharges='0', $capturePaymentImmediately) {
+  public static function updateClientsBillingAgreement($flApi, $status='Active', $includeGatewaysWithName='', $retryChargesEveryXHours='0', $removeAgreementStatusAfterXFailedCharges='0', $capturePaymentImmediately) {
     logActivity('Fleio: update all clients billing agreements');
        try {
             $clients = Capsule::table('tblhosting AS th')
@@ -306,20 +332,25 @@ class FleioUtils {
                            ->join('tblclients as tc', 'tc.id', '=', 'th.userid')
                            ->where('th.domainstatus', '=', $status)
                            ->where('tp.servertype', '=', 'fleio')
-                           ->select('tc.gatewayid', 'tc.id', 'tc.uuid', 'th.paymentmethod')
+                           ->select('tc.id', 'tc.uuid', 'th.paymentmethod')
                            ->get();
            } catch (Exception $e) {
              return NULL;
            }
         $agreements = [];
-        foreach($clients AS $client) {   
-          $hasAgreement = self::clientHasBillingAgreement($client->id, $client->gatewayid, $includeGatewaysWithPrefix);
+        foreach($clients AS $client) {
+          $hasAgreementResponse = self::clientHasBillingAgreement($client->id, $includeGatewaysWithName);
+          $hasAgreement = $hasAgreementResponse['hasAgreement'];
+          $gatewaysWithAgreementNames = $hasAgreementResponse['gatewayNames'];
           if ($hasAgreement) {
-            foreach(FleioUtils::$gateway_id_to_gateway_map AS $key => $gateway) {
-              if (substr($client->gatewayid, 0, strlen($key)) === $key) {
-                $hasAgreement = FleioUtils::$gateway_id_to_gateway_map[$key] === $client->paymentmethod;
-                break;
-              }
+            // TODO: move this piece of code in the clientHasBillingAgreement function
+            foreach(FleioUtils::$gateway_name_prefix_to_gateway_map AS $key => $gateway) {
+                foreach ($gatewaysWithAgreementNames AS $gatewayWithAgreementName) {
+                    if (substr($gatewayWithAgreementName, 0, strlen($key)) === $key) {
+                        $hasAgreement = FleioUtils::$gateway_name_prefix_to_gateway_map[$key] === $client->paymentmethod;
+                        break;
+                    }
+                }
             };
           }
           if ($hasAgreement === true && $capturePaymentImmediately) {
