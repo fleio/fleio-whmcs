@@ -65,11 +65,12 @@ function fleio_PostCronjob() {
             try {
                 $clientFromUUID = FleioUtils::getUUIDClient($clientOl['external_billing_id']);
                 if ($clientFromUUID != NULL) {
-                    $clientHasBillingAgreement = FleioUtils::clientHasBillingAgreement(
-                        $clientFromUUID->id, 
-                        $clientFromUUID->gatewayid, 
+                    // TODO: take billing agreement status of client from fleio response from fleio 2020.03
+                    $clientHasBillingAgreementResponse = FleioUtils::clientHasBillingAgreement(
+                        $clientFromUUID->id,
                         $server->configoption13
                     );
+                    $clientHasBillingAgreement = $clientHasBillingAgreementResponse['hasAgreement'];
                     $alreadyInvoicedAndUnpaid = FleioUtils::getFleioProductsInvoicedAmount($clientFromUUID->id, $server->id);
                     $fleioWhmcsService = $alreadyInvoicedAndUnpaid['product'];
                     $fleioWhmcsServiceId = $fleioWhmcsService->id;

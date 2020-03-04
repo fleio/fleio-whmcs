@@ -101,11 +101,11 @@ function fleio_ConfigOptions() {
         "Type" => "yesno",
         "Description" => "Attempt charging of auto generated invoices when CC is on file immediately after the invoice was issued",
     ),
-    "gatewaysPrefixForBillingAg" => array (
-        "FriendlyName" => "Prefix for gateways to use for billing agreement",
+    "gatewaysNamesForBillingAg" => array (
+        "FriendlyName" => "Names of gateways to use for billing agreement",
         "Type" => "text",
         "Size" => "32",
-        "Description" => "Comma separated string, each entry representing a prefix for a gateway that uses billing agreements. Leave empty to take into account all gateway ids",
+        "Description" => "Comma separated string, each entry representing a name for a gateway that uses billing agreements. Leave empty to take into account all gateways",
         "Default" => ""
     ),
     "doNotInvoiceAmountBelow" => array (
