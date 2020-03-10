@@ -18,6 +18,7 @@ add_hook("ClientEdit", 99, "fleio_client_edit");
 //add_hook("DailyCronJob", 99, "fleio_PostCronjob");
 add_hook("AfterCronJob", 99, "fleio_PostCronjob");
 add_hook("ShoppingCartValidateCheckout", 1, "limitOrders");
+add_hook('ClientAreaHomepagePanels', 1, "endUserDashboardCustomization");
 
 function fleio_PostCronjob() {
     // Retrieve a list of all Fleio Clients that have external billing set and have reached their credit limit or have 
@@ -397,5 +398,69 @@ function limitOrders($vars) {
                 }
             }
         }
+    }
+}
+
+function endUserDashboardCustomization(MenuItem $homePagePanels) {
+    $fleioServers = FleioUtils::getFleioProducts();
+    $service = NULL;
+    if (count($fleioServers)) {
+        // TODO: handle widgets for all fleio services
+        $service = FleioUtils::getClientProduct($_SESSION['uid'], $fleioServers[0]->id);
+    }
+    $bodyHtml = '';
+    if ($service) {
+        $flApi = Fleio::fromServiceId($service->id);
+        try {
+            $client = $flApi->getClient();
+        } catch (Exception $e) {
+            $client = NULL;
+        }
+        if ($client) {
+            $uptodateCreditFormatted = NULL;
+            if (is_array($client) && array_key_exists('uptodate_credit', $client) &&
+                array_key_exists('outofcredit_datetime', $client)) {
+                $uptodateCredit = $client['uptodate_credit'];
+                $negativeCredit = $uptodateCredit < 0;
+                $fleioClientCurrency = getCurrency($client['currency']);
+                try {
+                  $uptodateCreditFormatted = formatCurrency($uptodateCredit, $fleioClientCurrency['id']);
+                } catch (Exception $e) { 
+                  $uptodateCreditFormatted = '' . $uptodateCredit; 
+                }
+            }
+            if ($uptodateCreditFormatted) {
+                if ($negativeCredit) {
+                    $bodyHtml = $bodyHtml . '<p>Credit: ' . '<span style="color: red;">' . $uptodateCreditFormatted . '</span>';
+                } else {
+                    $bodyHtml = $bodyHtml . '<p>Credit: ' . $uptodateCreditFormatted;
+                }
+                $url  = Capsule::table('tblconfiguration')->where('setting','=', 'SystemURL')->first();
+                $system_url = $url->value;
+                $bodyHtml = $bodyHtml . ', <a href="' . $system_url . 'clientarea.php?action=productdetails&id=' .
+                    $service->id . '">Add credit</a></p>';
+            }
+            $bodyHtml = $bodyHtml . '<p>Auto-pay is ';
+            if ($client['has_billing_agreement']) {
+                $bodyHtml = $bodyHtml . 'active.</p>';
+            } else {
+                $bodyHtml = $bodyHtml . 'NOT active. ';
+                if ($fleioServers[0]->configoption17) {
+                    $bodyHtml = $bodyHtml . $fleioServers[0]->configoption17 . '</p>';
+                }
+            }
+        }
+        $fleioPanel = $homePagePanels->addChild('fleio cloud', array(
+            'label' => 'Cloud',
+            'icon' => 'fa-cloud',
+            'extras' => array(
+                'color' => 'green',
+                'btn-link' => $flApi->getSSOUrl(),
+                'btn-text' => 'Access Control Panel',
+                'btn-icon' => 'fa-arrow-right'
+            ),
+            'bodyHtml' => $bodyHtml,
+        ));
+        $fleioPanel->moveToFront();
     }
 }

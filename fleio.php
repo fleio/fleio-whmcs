@@ -129,6 +129,13 @@ function fleio_ConfigOptions() {
         "Description" => "If an invoice belonging to a client on agreement is not successfully paid after a number of retries you define, he will not be considered on agreement anymore. The number of retries that will work is limited to 2. Choose either 1 or 2. Also, setting this to 2 does not make sense if you do not use the retry auto-charge setting.",
         "Default" => "0",
     ),
+    "endUserWidgetNonAgreementMessage" => array (
+        "FriendlyName" => "Add a text to show to the enduser on the fleio dashboard widget if he is not on a billing agreement",
+        "Type" => "text",
+        "Size" => "10240",
+        "Description" => "Add a text to show to the enduser on the fleio dashboard widget if he is not on a billing agreement",
+        "Default" => "You can create a billing agreement when paying an invoice.",
+    )
     );
     return $configarray;
 }
