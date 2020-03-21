@@ -34,11 +34,11 @@ function fleio_PostCronjob() {
         $flApi = new FlApi($server->configoption4, $server->configoption1);
         FleioUtils::updateClientsBillingAgreement(
             $flApi,
-            $capturePaymentImmediately,
             'Active',
             $server->configoption13,
             $server->configoption15,
-            $server->configoption16
+            $server->configoption16,
+            $capturePaymentImmediately
         );
         logActivity('Fleio: retrieving all overdue clients');
         $url = "/clients/get_clients_to_invoice";
