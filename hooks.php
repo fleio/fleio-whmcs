@@ -383,16 +383,14 @@ function limitOrders($vars) {
                                     ->where('tblhosting.userid', '=', $_SESSION['uid'])
                                     ->select('tblhosting.domainstatus')
                                     ->get();
-                $otherServicesCount = 0;
-                $otherServicesFraudCount = 0;
+                $otherActiveServicesCount = 0;
                 foreach ($otherServices as $otherFleioService) {
-                    $otherServicesCount = $otherServicesCount + 1;
-                    if ($otherFleioService->domainstatus === 'Fraud') {
-                        $otherServicesFraudCount = $otherServicesFraudCount + 1;
+                    if ($otherFleioService->domainstatus !== 'Fraud' && $otherFleioService->domainstatus !== 'Terminated') {
+                        $otherActiveServicesCount = $otherActiveServicesCount + 1;
                     }
                 }
-                if ($otherServicesCount > 0 && $otherServicesCount !== $otherServicesFraudCount) {
-                    // throw error if user has any other fleio related service that isn't marked as fraud
+                if ($otherActiveServicesCount > 0) {
+                    // throw error if user has any other fleio related service that isn't marked as fraud or terminated
                     global $errormessage;
                     $errormessage = "<li>Cloud products are limited to one per customer. Contact support if you need help.</li>";
                 }
