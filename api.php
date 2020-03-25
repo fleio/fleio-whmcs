@@ -532,7 +532,7 @@ class FlApi {
         return $response;
     }
 
-    public function patch( $url, $params ) {
+    public function patch( $url, $params = NULL ) {
         $ch = curl_init();
         if (is_array($params)) {
             $json_params = json_encode($params);
@@ -544,7 +544,7 @@ class FlApi {
         return $response;
     }
 
-    public function get( $url, $params ) {
+    public function get( $url, $params = NULL ) {
         $ch = curl_init();
         $this->TEMP_HEADERS = array();
         if (is_array($params)) {

@@ -16,7 +16,7 @@ $whmcsClients = Capsule::table('tblclients')
                 ->select('tblclients.id', 'tblclients.uuid')
                 ->get();
 
-
+// SCRIPT WORKS IF THERE IS AT MOST ONE SERVICE PER CLIENT IN FLEIO
 echo 'There are '. $whmcsServicesCount . ' fleio services';
 echo "\r\n";
 
