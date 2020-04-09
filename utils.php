@@ -542,6 +542,7 @@ class FleioUtils {
                                         ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
                                         ->where('tblproducts.servertype', '=', 'fleio')
                                         ->where('tblhosting.domainstatus', '=', 'Suspended')
+                                        ->select('tblhosting.userid', 'tblhosting.id')
                                         ->get();
         foreach ($suspendedServicesInWhmcs as $whmcsSuspendedService) {
             $relatedClient = Capsule::table('tblclients')
@@ -550,15 +551,15 @@ class FleioUtils {
                                 ->select('tblclients.uuid', 'tblclients.id')
                                 ->first();
             try {
-                $relatedServiceUrl = "/billing/services?filtering=client__external_billing_id:" .
-                                     $relatedClient->uuid . "&";
-                $relatedServiceResponse = $flApi->get($relatedServiceUrl, array());
+                $servicesUrl = "/billing/services";
+                $relatedServiceResponse = $flApi->get($servicesUrl, array("filtering"=>"client__external_billing_id:".$relatedClient->uuid."+external_billing_id:".$whmcsSuspendedService->id."+product__product_type:openstack"));
                 if ($relatedServiceResponse['objects']) {
                     if ($relatedServiceResponse['objects'][0]['status'] === 'active') {
                         Capsule::table('tblhosting')
                             ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
                             ->where('tblproducts.servertype', '=', 'fleio')
                             ->where('tblhosting.userid', '=', $relatedClient->id)
+                            ->where('tblhosting.id', '=', $whmcsSuspendedService->id)
                             ->update(array("domainstatus"=>"Active"));
                         logActivity(
                             'Fleio: marking service of client with id ' . $relatedClient->id .
@@ -592,11 +593,12 @@ class FleioUtils {
                 foreach ($suspendedServices['objects'] as $serviceToSuspend) {
                     if ($serviceToSuspend['client']['external_billing_id']) {
                         $clientFromUUID = self::getUUIDClient($serviceToSuspend['client']['external_billing_id']);
-                        if ($clientFromUUID !== NULL) {
+                        if ($clientFromUUID !== NULL && $serviceToSuspend['external_billing_id'] !== NULL) {
                             $whmcsService = Capsule::table('tblhosting')
                                                 ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
                                                 ->where('tblproducts.servertype', '=', 'fleio')
                                                 ->where('tblhosting.userid', '=', $clientFromUUID->id)
+                                                ->where('tblhosting.id', '=', $serviceToSuspend['external_billing_id'])
                                                 ->select('tblhosting.domainstatus')
                                                 ->first();
                             if ($whmcsService && $whmcsService->domainstatus !== 'Suspended') {
@@ -604,6 +606,7 @@ class FleioUtils {
                                     ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
                                     ->where('tblproducts.servertype', '=', 'fleio')
                                     ->where('tblhosting.userid', '=', $clientFromUUID->id)
+                                    ->where('tblhosting.id', '=', $serviceToSuspend['external_billing_id'])
                                     ->update(array("domainstatus"=>'Suspended'));
                                 logActivity(
                                     'Fleio: marking service of client with id ' . $clientFromUUID->id .
