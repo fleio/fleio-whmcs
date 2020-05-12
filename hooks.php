@@ -277,17 +277,36 @@ function openstack_change_funds($invoiceid, $subtract=false) {
         if ($service->servertype == 'fleio') {
             # NOTE(tomo): Make sure the service is active. If it's not active and we don't handle this, the credit is lost.
             # NOTE(tomo): We currently handle this in the add/remove credit methods.
-            $clientCurrency = getCurrency($item->userid);
-            $defaultCurrency = getCurrency();
             $clientAmount = $cost_by_service[$item->relid]; // Amount + Setup and/or other related prices in client's currency
-            # NOTE(tomo): Fleio needs to use the WHMCS default currency
-            $amount = convertCurrency($clientAmount, 1, $clientCurrency['id']);    // Amount in default currency.
-            if ($amount == 0) {
+            if ($clientAmount == 0) {
                 logActivity('Fleio: ignoring Service ID: '. $item->relid . ' with cost equal to 0 from Invoice ID: ' . $invoiceid);
                 continue;
             }
             $fl = Fleio::fromServiceId($item->relid);
             # TODO(tomo): We use the userid which can be a contact ?
+            try {
+                $fleioClient = $fl->getClient();
+            } catch (Exception $e) {
+                logActivity('Unable to get Fleio client currency when trying to change credit: ' . $e->getMessage());
+                return;
+            }
+            $fleioClientCurrencyCode = $fleioClient['currency'];
+            $whmcsFleioClientCurrency = Capsule::table('tblcurrencies')
+                                            ->select('id', 'code')
+                                            ->where('code', '=', $fleioClientCurrencyCode)
+                                            ->first();
+            if (!$whmcsFleioClientCurrency) {
+                logActivity(
+                    'ERROR: Could not proceed changing client (' .
+                    $fleioClient['external_billing_id'] .
+                    ') credit in fleio because his currency from fleio (' .
+                    $fleioClientCurrencyCode .
+                    ') does not exist in whmcs'
+                );
+                return;
+            }
+            $originalCurrency = getCurrency($item->userid);
+            $amount = convertCurrency($clientAmount, $originalCurrency['id'], $whmcsFleioClientCurrency->id);
             try {
                 $addCredit = !$subtract;    // Add credit or subtract, boolean
                 if ($addCredit) {
@@ -295,14 +314,29 @@ function openstack_change_funds($invoiceid, $subtract=false) {
                 } else {
                     $msg_format = "Fleio: removing credit for WHMCS User ID: %s with %.02f %s (%.02f %s from Invoice ID: %s)";
                 }
-                $msg = sprintf($msg_format, $item->userid, $amount, $defaultCurrency["code"], $clientAmount, $clientCurrency["code"], $invoiceid);
+                $msg = sprintf(
+                    $msg_format,
+                    $item->userid,
+                    $amount,
+                    $whmcsFleioClientCurrency->code,
+                    $clientAmount,
+                    $originalCurrency["code"],
+                    $invoiceid
+                );
                 logActivity($msg);
-                $response = $fl->clientChangeCredit($addCredit, $amount, $defaultCurrency["code"], $clientCurrency["rate"], $clientAmount, $clientCurrency["code"], $invoiceid);
+                $response = $fl->clientChangeCredit(
+                    $addCredit, $amount, $whmcsFleioClientCurrency->code, $originalCurrency["rate"], $clientAmount,
+                    $originalCurrency["code"], $invoiceid
+                );
             } catch (FlApiException $e) {
                 logActivity("Unable to update the client credit in Fleio: " . $e->getMessage()); 
                 return;
             }
-            logActivity("Fleio: successfully changed client credit with ".$amount." ".$defaultCurrency["code"]. " for Fleio client id: ".$response['client'].". New Fleio balance: ".$response['credit_balance']." ".$defaultCurrency["code"]); 
+            logActivity(
+                "Fleio: successfully changed client credit with ".$amount." ".$whmcsFleioClientCurrency->code.
+                " for Fleio client id: ".$response['client'].". New Fleio balance: ".$response['credit_balance']." ".
+                $whmcsFleioClientCurrency->code
+            );
         }
     }
 }
