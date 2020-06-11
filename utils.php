@@ -457,7 +457,29 @@ class FleioUtils {
         $fleioWhmcsServiceId = $fleioWhmcsService->id;
         $daysSinceLastInvoice = $alreadyInvoicedAndUnpaid['days_since_last_invoice'];
         $daysSinceLastInvoice = $daysSinceLastInvoice === NULL ? 999999 : $daysSinceLastInvoice;
-        $amountUsedAndUninvoiced = 0 - $clientDetailsToProcess['uptodate_credit'] - $alreadyInvoicedAndUnpaid["amount"];
+        // $clientDetailsToProcess["currency"] is the Fleio received amount currency code
+        if ($clientDetailsToProcess["currency"] === $alreadyInvoicedAndUnpaid["currency"]["code"]) {
+            $upToDateCredit = $clientDetailsToProcess['uptodate_credit'];
+        } else {
+            // currencies differ, we need to do a conversion in order to add an invoice in whmcs with
+            // correct amount & currency
+            $initialUpToDateCreditWhmcsCurrency = Capsule::table('tblcurrencies')
+                ->select('id', 'code')
+                ->where('code', '=', $clientDetailsToProcess["currency"])
+                ->first();
+            if (!$initialUpToDateCreditWhmcsCurrency) {
+                throw new FlApiException(
+                    'Could not find Fleio received amount currency in whmcs in order to convert it to whmcs'.
+                    ' amount currency.'
+                );
+            }
+            $upToDateCredit = convertCurrency(
+                $clientDetailsToProcess['uptodate_credit'],
+                $initialUpToDateCreditWhmcsCurrency->id,
+                $alreadyInvoicedAndUnpaid["currency"]["id"]
+            );
+        }
+        $amountUsedAndUninvoiced = 0 - $upToDateCredit - $alreadyInvoicedAndUnpaid["amount"];
         // Check unsettled Fleio billing histories
         if ($amountUsedAndUninvoiced > 0) {
             $clientCurrency = getCurrency($whmcsClient->id);
@@ -465,8 +487,9 @@ class FleioUtils {
                 $doNotInvoiceAmountBelow = "0";
             }
             $doNotInvoiceAmountBelow = (float)$doNotInvoiceAmountBelow;
+            $defaultCurrency = getCurrency();
             $doNotInvoiceAmountBelowClientCurrency = convertCurrency(
-                $doNotInvoiceAmountBelow, 1, $clientCurrency['id']
+                $doNotInvoiceAmountBelow, $defaultCurrency['id'], $clientCurrency['id']
             );
             if ($amountUsedAndUninvoiced >= $doNotInvoiceAmountBelowClientCurrency) {
                 if (sizeof($clientDetailsToProcess['unsettled_periods']) > 0 && $daysSinceLastInvoice > 0) {
