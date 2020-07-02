@@ -448,6 +448,8 @@ function endUserDashboardCustomization(MenuItem $homePagePanels) {
         } catch (Exception $e) {
             $client = NULL;
         }
+        $url  = Capsule::table('tblconfiguration')->where('setting','=', 'SystemURL')->first();
+        $system_url = $url->value;
         if ($client) {
             $uptodateCreditFormatted = NULL;
             if (is_array($client) && array_key_exists('uptodate_credit', $client) &&
@@ -467,8 +469,6 @@ function endUserDashboardCustomization(MenuItem $homePagePanels) {
                 } else {
                     $bodyHtml = $bodyHtml . '<p>Credit: ' . $uptodateCreditFormatted;
                 }
-                $url  = Capsule::table('tblconfiguration')->where('setting','=', 'SystemURL')->first();
-                $system_url = $url->value;
                 $bodyHtml = $bodyHtml . ', <a href="' . $system_url . 'clientarea.php?action=productdetails&id=' .
                     $service->id . '">Add credit</a></p>';
             }
@@ -487,7 +487,7 @@ function endUserDashboardCustomization(MenuItem $homePagePanels) {
             'icon' => 'fa-cloud',
             'extras' => array(
                 'color' => 'green',
-                'btn-link' => $flApi->getSSOUrl(),
+                'btn-link' => $system_url . 'accesscloudcontrolpanel.php',
                 'btn-text' => 'Access Control Panel',
                 'btn-icon' => 'fa-arrow-right'
             ),

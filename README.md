@@ -17,6 +17,7 @@ enables service providers to sell public cloud services.
 
 1. Copy the source files to the WHMCS installation directory in `modules/servers/fleio`
 2. Move `WHMCS_INSTALL_DIR/modules/servers/fleio/fleioaddcredit.php` to `WHMCS_INSTALL_DIR/fleioaddcredit.php`
+2. Move `WHMCS_INSTALL_DIR/modules/servers/fleio/accesscloudcontrolpanel.php` to `WHMCS_INSTALL_DIR/accesscloudcontrolpanel.php`
 3. Login to WHMCS as admin and create a new product from: `Setup -> Product/Services -> Product/Services -> Create New Product`
 4. Under Module Settings on the new product page, select the `Fleio` module
 5. Retrieve a token from Fleio (after logging in as admin in backend (/backend/admin) -> Tokens -> Add Token for a staff user) 
