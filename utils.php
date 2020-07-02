@@ -535,6 +535,68 @@ class FleioUtils {
         return NULL;
     }
 
+    public static function invoiceClientByAmount($whmcsClient, $amount, $currencyCode, $doNotInvoiceAmountBelow,
+                                                 $alreadyInvoicedAndUnpaid) {
+        // used for generating invoice for auto invoicing feature
+        $fleioWhmcsService = $alreadyInvoicedAndUnpaid['product'];
+        $fleioWhmcsServiceId = $fleioWhmcsService->id;
+        // $currencyCode is the Fleio received amount currency code
+        if ($currencyCode === $alreadyInvoicedAndUnpaid["currency"]["code"]) {
+            $finalAmount = $amount;
+        } else {
+            // currencies differ, we need to do a conversion in order to add an invoice in whmcs with
+            // correct amount & currency
+            $initialAmountWhmcsCurrency = Capsule::table('tblcurrencies')
+                ->select('id', 'code')
+                ->where('code', '=', $currencyCode)
+                ->first();
+            if (!$initialAmountWhmcsCurrency) {
+                throw new FlApiException(
+                    'Could not find Fleio received amount currency in whmcs in order to convert it to whmcs'.
+                    ' amount currency.'
+                );
+            }
+            $finalAmount = convertCurrency(
+                $amount,
+                $initialAmountWhmcsCurrency->id,
+                $alreadyInvoicedAndUnpaid["currency"]["id"]
+            );
+        }
+        // do not invoice anything, or just some of the fleio received amount, 
+        // if unpaid invoices already exist for that amount
+        $finalAmount = $finalAmount - $alreadyInvoicedAndUnpaid["amount"];
+
+        if ($finalAmount > 0) {
+            $clientCurrency = getCurrency($whmcsClient->id);
+            if ($doNotInvoiceAmountBelow === NULL) {
+                $doNotInvoiceAmountBelow = "0";
+            }
+            $doNotInvoiceAmountBelow = (float)$doNotInvoiceAmountBelow;
+            $defaultCurrency = getCurrency();
+            $doNotInvoiceAmountBelowClientCurrency = convertCurrency(
+                $doNotInvoiceAmountBelow, $defaultCurrency['id'], $clientCurrency['id']
+            );
+            if ($finalAmount >= $doNotInvoiceAmountBelowClientCurrency) {
+                $invoicePaymentMethod = $fleioWhmcsService->paymentmethod;
+                $invoiceId = self::createOverdueClientInvoice(
+                    $whmcsClient->id,
+                    $finalAmount,
+                    $fleioWhmcsServiceId,
+                    $invoicePaymentMethod
+                );
+                logActivity(
+                    'Fleio: issued Invoice ID: '. $invoiceId .' for User ID: '.
+                    $whmcsClient->id. ' due to auto invoicing feature for '.
+                    $finalAmount . ' ' .
+                    $alreadyInvoicedAndUnpaid["currency"]["code"]
+                );
+                return $invoiceId;
+            }
+        }
+        
+        return NULL;
+    }
+
     public static function resetInvoicedPeriodsStatus($flApi, $clientToProcess) {
         $servicesToReset = array();
         foreach ($clientToProcess['unsettled_periods'] as $clientPeriod) {
