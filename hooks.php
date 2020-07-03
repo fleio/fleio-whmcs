@@ -140,24 +140,19 @@ function fleio_PostCronjob() {
             continue;
         }
 
-        $url = "/billing/invoices/get_clients_to_auto_invoice";
-
-        $whmcsClients = Capsule::table('tblhosting AS th')
-                        ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
-                        ->join('tblclients as tc', 'tc.id', '=', 'th.userid')
-                        ->where('th.domainstatus', '=', 'Active')
-                        ->where('tp.servertype', '=', 'fleio')
-                        ->get();
-        $whmcsClientsCount = Capsule::table('tblhosting AS th')
-                            ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
-                            ->join('tblclients as tc', 'tc.id', '=', 'th.userid')
-                            ->where('th.domainstatus', '=', 'Active')
-                            ->where('tp.servertype', '=', 'fleio')
-                            ->count();
-
+        $urlGetAutoInvoiceClients = '/billing/invoices/get_clients_to_auto_invoice_for_external_billing';
+        try {
+            $clientsToAutoInvoiceResponse = $flApi->get($urlGetAutoInvoiceClients);
+        } catch ( Exception $e ) {
+            $clientsToAutoInvoiceResponse = array("objects" => []);
+            logActivity($e->getMessage());
+        }
+        $retrievedClients = $clientsToAutoInvoiceResponse['objects'];
+        
+        $urlProcessAutoInvoicing = "/billing/invoices/process_clients_for_credit_auto_invoicing";
         $counter = 0;
         $creditAutoInvoicedCount = 0;
-        foreach($whmcsClients AS $whmcsClient) {
+        foreach($retrievedClients AS $retrievedClientUUID) {
             $counter = $counter + 1;
             if ($creditAutoInvoicedCount === 0) {
                 // re-set array as we process 20 clients at a time
@@ -166,17 +161,19 @@ function fleio_PostCronjob() {
             }
 
             // compose data that has to be sent to Fleio (already invoiced but unpaid amount)
-            $invoicedAmountData = FleioUtils::getFleioProductsInvoicedAmount($whmcsClient->id, $server->id);
-            $clientToAutoInvoice = array(
-                "external_billing_id" => $whmcsClient->uuid, 
-                "credit_still_to_be_paid" => $invoicedAmountData["amount"],
-                "credit_still_to_be_paid_currency_code" => $invoicedAmountData["currency"]["code"]
-            );
-            array_push($whmcsClientsToAutoInvoice, $clientToAutoInvoice);
-            $creditAutoInvoicedCount = $creditAutoInvoicedCount + 1; 
-            
+            $clientFromUUID = FleioUtils::getUUIDClient($retrievedClientUUID);
+            if ($clientFromUUID !== NULL) {
+                $invoicedAmountData = FleioUtils::getFleioProductsInvoicedAmount($clientFromUUID->id, $server->id);
+                $clientToAutoInvoice = array(
+                    "external_billing_id" => $retrievedClientUUID, 
+                    "credit_still_to_be_paid" => $invoicedAmountData["amount"],
+                    "credit_still_to_be_paid_currency_code" => $invoicedAmountData["currency"]["code"]
+                );
+                array_push($whmcsClientsToAutoInvoice, $clientToAutoInvoice);
+                $creditAutoInvoicedCount = $creditAutoInvoicedCount + 1; 
+            }
 
-            if ($creditAutoInvoicedCount === 20 || $counter === $whmcsClientsCount) {
+            if ($creditAutoInvoicedCount === 20 || $counter === count($retrievedClients)) {
                 // if we reached 20 clients or the end of list, send them to fleio
                 $creditAutoInvoicedCount = 0;
                 // process clients we found
@@ -184,7 +181,7 @@ function fleio_PostCronjob() {
                     "clients" => $whmcsClientsToAutoInvoice
                 );
                 try {
-                    $clientsToAutoInvoice = $flApi->post($url, $urlParams);
+                    $clientsToAutoInvoice = $flApi->post($urlProcessAutoInvoicing, $urlParams);
                 } catch ( Exception $e ) {
                     logActivity($e->getMessage());
                     continue;
