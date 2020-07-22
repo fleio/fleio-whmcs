@@ -140,7 +140,7 @@ function fleio_PostCronjob() {
             continue;
         }
 
-        $urlGetAutoInvoiceClients = '/billing/invoices/get_clients_to_auto_invoice_for_external_billing';
+        $urlGetAutoInvoiceClients = '/billing/external-billing/get_clients_to_auto_invoice_for_external_billing';
         try {
             $clientsToAutoInvoiceResponse = $flApi->get($urlGetAutoInvoiceClients);
         } catch ( Exception $e ) {
@@ -149,7 +149,7 @@ function fleio_PostCronjob() {
         }
         $retrievedClients = $clientsToAutoInvoiceResponse['objects'];
         
-        $urlProcessAutoInvoicing = "/billing/invoices/process_clients_for_credit_auto_invoicing";
+        $urlProcessAutoInvoicing = "/billing/external-billing/process_clients_for_credit_auto_invoicing";
         $counter = 0;
         $creditAutoInvoicedCount = 0;
         foreach($retrievedClients AS $retrievedClientUUID) {
