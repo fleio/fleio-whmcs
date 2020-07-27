@@ -135,6 +135,13 @@ function fleio_ConfigOptions() {
         "Size" => "10240",
         "Description" => "Add a text to show to the enduser on the fleio dashboard widget if he is not on a billing agreement",
         "Default" => "You can create a billing agreement when paying an invoice.",
+    ),
+    "fleioWidgetExtraHtml" => array (
+        "FriendlyName" => "Fleio widget extra html",
+        "Type" => "text",
+        "Size" => "10240",
+        "Description" => "Add html input on the fleio dashboard widget after the existing content",
+        "Default" => "",
     )
     );
     return $configarray;
