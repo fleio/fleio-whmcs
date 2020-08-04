@@ -140,6 +140,10 @@ function fleio_PostCronjob() {
             continue;
         }
 
+        FleioUtils::markWhmcsSuspendedServices($server->configoption4, $flApi);
+
+        FleioUtils::markWhmcsActiveServices($server->configoption4, $flApi);
+
         $urlGetAutoInvoiceClients = '/billing/external-billing/get_clients_to_auto_invoice_for_external_billing';
         try {
             $clientsToAutoInvoiceResponse = $flApi->get($urlGetAutoInvoiceClients);
@@ -233,12 +237,7 @@ function fleio_PostCronjob() {
                     }
                 }
             }
-
         }
-
-        FleioUtils::markWhmcsSuspendedServices($server->configoption4, $flApi);
-
-        FleioUtils::markWhmcsActiveServices($server->configoption4, $flApi);
 
     }
 }
