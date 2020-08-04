@@ -578,6 +578,9 @@ function endUserDashboardCustomization(MenuItem $homePagePanels) {
                 }
             }
         }
+        if ($fleioServers[0]->configoption18) {
+            $bodyHtml = $bodyHtml . $fleioServers[0]->configoption18;
+        }
         $fleioPanel = $homePagePanels->addChild('fleio cloud', array(
             'label' => 'Cloud',
             'icon' => 'fa-cloud',
