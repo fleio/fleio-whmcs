@@ -167,14 +167,19 @@ function fleio_PostCronjob() {
             // compose data that has to be sent to Fleio (already invoiced but unpaid amount)
             $clientFromUUID = FleioUtils::getUUIDClient($retrievedClientUUID);
             if ($clientFromUUID !== NULL) {
-                $invoicedAmountData = FleioUtils::getFleioProductsInvoicedAmount($clientFromUUID->id, $server->id);
-                $clientToAutoInvoice = array(
-                    "external_billing_id" => $retrievedClientUUID, 
-                    "credit_still_to_be_paid" => $invoicedAmountData["amount"],
-                    "credit_still_to_be_paid_currency_code" => $invoicedAmountData["currency"]["code"]
-                );
-                array_push($whmcsClientsToAutoInvoice, $clientToAutoInvoice);
-                $creditAutoInvoicedCount = $creditAutoInvoicedCount + 1; 
+                try {
+                    $invoicedAmountData = FleioUtils::getFleioProductsInvoicedAmount($clientFromUUID->id, $server->id);
+                    $clientToAutoInvoice = array(
+                        "external_billing_id" => $retrievedClientUUID, 
+                        "credit_still_to_be_paid" => $invoicedAmountData["amount"],
+                        "credit_still_to_be_paid_currency_code" => $invoicedAmountData["currency"]["code"]
+                    );
+                    array_push($whmcsClientsToAutoInvoice, $clientToAutoInvoice);
+                    $creditAutoInvoicedCount = $creditAutoInvoicedCount + 1;
+                } catch ( Exception $e ) {
+                    logActivity($e->getMessage());
+                    continue;
+                }
             }
 
             if ($creditAutoInvoicedCount === 20 || $counter === count($retrievedClients)) {
