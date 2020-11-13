@@ -64,6 +64,8 @@ If *Invoice clients without billing agreement* is checked in the Fleio Module Se
 * any time during a month, if uninvoiced usage exceeds the credit limit defined in Fleio configuration (10 USD in our example)
 * at the end a billing cycle (one month), for the amount consumed if it's not lower than the *Do not invoice amount below* limit
 
+Also, if *Invoice only in end of cycle timespan* is checked, invoice won't be issued at the end of the billing cycle (related service cycle having a status of "unpaid") if WHMCS cron runs and processes the client 72 hours after the cycle end date.
+
 The same as the above applies for clients with a billing agreement of CC on file when *Invoice clients with billing agreement* is checked with the usage being over 20 USD.
 If the option *Attempt a charge immediately* is also checked, then a charge is attempted automatically for these clients, for the invoices issued.
 
