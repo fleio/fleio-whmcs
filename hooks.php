@@ -57,10 +57,19 @@ function fleio_PostCronjob() {
             logActivity('Fleio: Looking at clients without a billing agreement only');
         };
         try {
+            $invoiceOnlyInEndOfCycleTimespan = $server->configoption19 == 'on' ? true : false; // invoice clients only 
+            // if latest unpaid cycle end dt is in the past 72h
             logActivity('Fleio: using server ' . $server->configoption4);
             $clientsOverLimit = $flApi->get($url, $urlParams);
             $numInvoicedClients = 0;
             foreach ($clientsOverLimit as $clientOl) {
+                if (array_key_exists('has_service_cycle_recently_ended', $clientOl) && array_key_exists('reached_credit_limit', $clientOl)) {
+                    if ($invoiceOnlyInEndOfCycleTimespan &&
+                        (!$clientOl['has_service_cycle_recently_ended'] && !$clientOl['reached_credit_limit'])) {
+                        // skip clients did not reach credit limit or don't have a recently ended service cycle (in last 72h)
+                        continue;
+                    }
+                }
                 $invoiceProcessingUrl = sprintf('/clients/%s/get_client_for_invoice_processing', $clientOl['id']);
                 try {
                     $clientToProcess = $flApi->get($invoiceProcessingUrl, array());

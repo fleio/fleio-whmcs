@@ -142,7 +142,12 @@ function fleio_ConfigOptions() {
         "Size" => "10240",
         "Description" => "Add html input on the fleio dashboard widget after the existing content",
         "Default" => "",
-    )
+    ),
+    "invoiceOnlyInEndOfCycleTimespan" => array (
+        "FriendlyName" => "Invoice only in end of cycle timespan",
+        "Type" => "yesno",
+        "Description" => "Will not invoice for end of cycle if more than 72h passed after cycle end date",
+    ),
     );
     return $configarray;
 }
