@@ -153,6 +153,9 @@ all Fleio client's services should be checked to have prices in the new currency
 If you're using the generate invoice feature of fleio-whmcs, automatic settlements and invoice generation settings have 
 to be disabled.
 
+Partial refunds are must be manualy handled. The Fleio credit will not be modified if you partially refund an invoice in WHMCS
+
+
 License information
 ===================
 
