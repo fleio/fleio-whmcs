@@ -369,18 +369,22 @@ function openstack_change_funds($invoiceid, $subtract=false) {
                 $promo_by_service[$item->relid] = $item->amount;
             }
         } else {
-            if (isset($cost_by_service[$item->relid])) {
-                $cost_by_service[$item->relid] += $item->amount;
-            } else {
-                $cost_by_service[$item->relid] = $item->amount;
+            if ($item->type == 'Hosting') {
+                if (isset($cost_by_service[$item->relid])) {
+                    $cost_by_service[$item->relid] += $item->amount;
+                } else {
+                    $cost_by_service[$item->relid] = $item->amount;
+                }
             }
         }
     }
 
+    $processedServices = [];
     foreach($items as $item) {
-        if (($item->type != 'Hosting') || !isset($cost_by_service[$item->relid])) {
+        if (($item->type != 'Hosting') || !isset($cost_by_service[$item->relid]) || in_array($item->relid, $processedServices)) {
              continue;
         }
+        array_push($processedServices, $item->relid);
         # We now know that relid is a Hosting package (not a Domain for example)
         $service = FleioUtils::getServiceById($item->relid);
         if ($service->servertype == 'fleio') {
