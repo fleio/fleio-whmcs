@@ -668,7 +668,6 @@ class FleioUtils {
         while ($servicesNext) {
             $servicePage = $servicePage + 1;
             try {
-                logActivity('Fleio: using server ' . $serverDetails);
                 $servicesUrl = "/billing/services?filtering=product__product_type:openstack%2Bstatus:suspended&page=" .
                                (string)$servicePage . "&";
                 $suspendedServices = $flApi->get($servicesUrl, array());
