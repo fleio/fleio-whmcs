@@ -40,7 +40,6 @@ function fleio_PostCronjob() {
             $server->configoption16,
             $capturePaymentImmediately
         );
-        logActivity('Fleio: retrieving all overdue clients');
         $url = "/clients/get_clients_to_invoice";
         $urlParams = array(
             "has_external_billing" => 'True', // only clients with external billing set and credit less than 0
@@ -56,198 +55,204 @@ function fleio_PostCronjob() {
             $urlParams['has_billing_agreement'] = 'False';
             logActivity('Fleio: Looking at clients without a billing agreement only');
         };
-        try {
-            $invoiceOnlyInEndOfCycleTimespan = $server->configoption19 == 'on' ? true : false; // invoice clients only 
-            // if latest unpaid cycle end dt is in the past 72h
-            logActivity('Fleio: using server ' . $server->configoption4);
-            $clientsOverLimit = $flApi->get($url, $urlParams);
-            $numInvoicedClients = 0;
-            foreach ($clientsOverLimit as $clientOl) {
-                if (array_key_exists('has_service_cycle_recently_ended', $clientOl) && array_key_exists('reached_credit_limit', $clientOl)) {
-                    if ($invoiceOnlyInEndOfCycleTimespan &&
-                        (!$clientOl['has_service_cycle_recently_ended'] && !$clientOl['reached_credit_limit'])) {
-                        // skip clients did not reach credit limit or don't have a recently ended service cycle (in last 72h)
-                        continue;
+
+        if ($invoiceWithAgreement || $invoiceWithoutAgreement) {
+            logActivity('Fleio: retrieving all overdue clients');
+            try {
+                $invoiceOnlyInEndOfCycleTimespan = $server->configoption19 == 'on' ? true : false; // invoice clients only 
+                // if latest unpaid cycle end dt is in the past 72h
+                logActivity('Fleio: using server ' . $server->configoption4);
+                $clientsOverLimit = $flApi->get($url, $urlParams);
+                $numInvoicedClients = 0;
+                foreach ($clientsOverLimit as $clientOl) {
+                    if (array_key_exists('has_service_cycle_recently_ended', $clientOl) && array_key_exists('reached_credit_limit', $clientOl)) {
+                        if ($invoiceOnlyInEndOfCycleTimespan &&
+                            (!$clientOl['has_service_cycle_recently_ended'] && !$clientOl['reached_credit_limit'])) {
+                            // skip clients did not reach credit limit or don't have a recently ended service cycle (in last 72h)
+                            continue;
+                        }
                     }
-                }
-                $invoiceProcessingUrl = sprintf('/clients/%s/get_client_for_invoice_processing', $clientOl['id']);
-                try {
-                    $clientToProcess = $flApi->get($invoiceProcessingUrl, array());
-                } catch ( Exception $e ) {
-                    $clientToProcess = NULL;
-                    logActivity(
-                        'Fleio: error when trying to get fleio client (' . $clientOl['id'] .
-                        ') in order to process and invoice him: ' . $e->getMessage()
-                    );
-                }
-                if ($clientToProcess) {
+                    $invoiceProcessingUrl = sprintf('/clients/%s/get_client_for_invoice_processing', $clientOl['id']);
                     try {
-                        $clientFromUUID = FleioUtils::getUUIDClient($clientToProcess['external_billing_id']);
-                        if ($clientFromUUID != NULL) {
-                            try {
-                                $generatedInvoiceId = FleioUtils::invoiceClient(
-                                    $clientFromUUID,
-                                    $clientToProcess,
-                                    $server->configoption14,
-                                    FleioUtils::getFleioProductsInvoicedAmount($clientFromUUID->id, $server->id)
-                                );
-                            } catch ( Exception $e ) {
-                                logActivity(
-                                    'Fleio: error when trying to invoice client ' .
-                                    $clientToProcess['external_billing_id'] . ': ' . $e->getMessage()
-                                );
-                                $generatedInvoiceId = NULL;
-                            }
-                            if ($generatedInvoiceId) {
-                                $numInvoicedClients += 1;
-                                // TODO: take billing agreement status of client from fleio response from fleio 2020.03
-                                $clientHasBillingAgreementResponse = FleioUtils::clientHasBillingAgreement(
-                                    $clientFromUUID->id,
-                                    $server->configoption13
-                                );
-                                $clientHasBillingAgreement = $clientHasBillingAgreementResponse['hasAgreement'];
-                                if ($capturePaymentImmediately && $clientHasBillingAgreement) {
-                                    $captured = FleioUtils::captureInvoicePayment($generatedInvoiceId);
-                                    if ($captured === false && $server->configoption16 === '1') {
-                                        // capture failed and setting says the client is no more on agreement
-                                        FleioUtils::removeClientBillingAgreement(
-                                            $flApi, $clientToProcess['external_billing_id']
-                                        );
+                        $clientToProcess = $flApi->get($invoiceProcessingUrl, array());
+                    } catch ( Exception $e ) {
+                        $clientToProcess = NULL;
+                        logActivity(
+                            'Fleio: error when trying to get fleio client (' . $clientOl['id'] .
+                            ') in order to process and invoice him: ' . $e->getMessage()
+                        );
+                    }
+                    if ($clientToProcess) {
+                        try {
+                            $clientFromUUID = FleioUtils::getUUIDClient($clientToProcess['external_billing_id']);
+                            if ($clientFromUUID != NULL) {
+                                try {
+                                    $generatedInvoiceId = FleioUtils::invoiceClient(
+                                        $clientFromUUID,
+                                        $clientToProcess,
+                                        $server->configoption14,
+                                        FleioUtils::getFleioProductsInvoicedAmount($clientFromUUID->id, $server->id)
+                                    );
+                                } catch ( Exception $e ) {
+                                    logActivity(
+                                        'Fleio: error when trying to invoice client ' .
+                                        $clientToProcess['external_billing_id'] . ': ' . $e->getMessage()
+                                    );
+                                    $generatedInvoiceId = NULL;
+                                }
+                                if ($generatedInvoiceId) {
+                                    $numInvoicedClients += 1;
+                                    // TODO: take billing agreement status of client from fleio response from fleio 2020.03
+                                    $clientHasBillingAgreementResponse = FleioUtils::clientHasBillingAgreement(
+                                        $clientFromUUID->id,
+                                        $server->configoption13
+                                    );
+                                    $clientHasBillingAgreement = $clientHasBillingAgreementResponse['hasAgreement'];
+                                    if ($capturePaymentImmediately && $clientHasBillingAgreement) {
+                                        $captured = FleioUtils::captureInvoicePayment($generatedInvoiceId);
+                                        if ($captured === false && $server->configoption16 === '1') {
+                                            // capture failed and setting says the client is no more on agreement
+                                            FleioUtils::removeClientBillingAgreement(
+                                                $flApi, $clientToProcess['external_billing_id']
+                                            );
+                                        }
                                     }
+                                } else {
+                                    // re-set the status of invoiced periods
+                                    FleioUtils::resetInvoicedPeriodsStatus($flApi, $clientToProcess);
                                 }
                             } else {
+                                logActivity(
+                                    'Fleio: unable to retrieve WHMCS client with UUID: ' .
+                                    $clientToProcess['external_billing_id']
+                                );
                                 // re-set the status of invoiced periods
                                 FleioUtils::resetInvoicedPeriodsStatus($flApi, $clientToProcess);
+                                continue;
                             }
-                        } else {
-                            logActivity(
-                                'Fleio: unable to retrieve WHMCS client with UUID: ' .
-                                $clientToProcess['external_billing_id']
-                            );
+                        } catch ( Exception $e ) {
+                            logActivity($e->getMessage());
                             // re-set the status of invoiced periods
                             FleioUtils::resetInvoicedPeriodsStatus($flApi, $clientToProcess);
                             continue;
                         }
-                    } catch ( Exception $e ) {
-                        logActivity($e->getMessage());
-                        // re-set the status of invoiced periods
-                        FleioUtils::resetInvoicedPeriodsStatus($flApi, $clientToProcess);
-                        continue;
                     }
                 }
+                if ($numInvoicedClients > 0) {
+                    logActivity('Fleio: invoiced ' . $numInvoicedClients . ' overdue clients' );
+                } else {
+                    logActivity('Fleio: no overdue clients to invoice found on ' . $server->configoption4);
+                }
+            } catch ( Exception $e ) {
+                logActivity(
+                    'Fleio: unable to retrieve over credit clients from '. $server->configoption4 . ' (' .
+                    $e->getMessage() . ')'
+                );
+                continue;
             }
-            if ($numInvoicedClients > 0) {
-                logActivity('Fleio: invoiced ' . $numInvoicedClients . ' overdue clients' );
-            } else {
-                logActivity('Fleio: no overdue clients to invoice found on ' . $server->configoption4);
-            }
-        } catch ( Exception $e ) {
-            logActivity(
-                'Fleio: unable to retrieve over credit clients from '. $server->configoption4 . ' (' .
-                $e->getMessage() . ')'
-            );
-            continue;
         }
 
         FleioUtils::markWhmcsSuspendedServices($server->configoption4, $flApi);
 
         FleioUtils::markWhmcsActiveServices($server->configoption4, $flApi);
 
-        $urlGetAutoInvoiceClients = '/billing/external-billing/get_clients_to_auto_invoice_for_external_billing';
-        try {
-            $clientsToAutoInvoiceResponse = $flApi->get($urlGetAutoInvoiceClients);
-        } catch ( Exception $e ) {
-            $clientsToAutoInvoiceResponse = array("objects" => []);
-            logActivity($e->getMessage());
-        }
-        $retrievedClients = $clientsToAutoInvoiceResponse['objects'];
-        
-        $urlProcessAutoInvoicing = "/billing/external-billing/process_clients_for_credit_auto_invoicing";
-        $counter = 0;
-        $creditAutoInvoicedCount = 0;
-        foreach($retrievedClients AS $retrievedClientUUID) {
-            $counter = $counter + 1;
-            if ($creditAutoInvoicedCount === 0) {
-                // re-set array as we process 20 clients at a time
-                $whmcsClientsToAutoInvoice = [];
-                $urlParams = array();
+        if ($invoiceWithAgreement || $invoiceWithoutAgreement) {
+            $urlGetAutoInvoiceClients = '/billing/external-billing/get_clients_to_auto_invoice_for_external_billing';
+            try {
+                $clientsToAutoInvoiceResponse = $flApi->get($urlGetAutoInvoiceClients);
+            } catch ( Exception $e ) {
+                $clientsToAutoInvoiceResponse = array("objects" => []);
+                logActivity($e->getMessage());
             }
-
-            // compose data that has to be sent to Fleio (already invoiced but unpaid amount)
-            $clientFromUUID = FleioUtils::getUUIDClient($retrievedClientUUID);
-            if ($clientFromUUID !== NULL) {
-                try {
-                    $invoicedAmountData = FleioUtils::getFleioProductsInvoicedAmount($clientFromUUID->id, $server->id);
-                    $clientToAutoInvoice = array(
-                        "external_billing_id" => $retrievedClientUUID, 
-                        "credit_still_to_be_paid" => $invoicedAmountData["amount"],
-                        "credit_still_to_be_paid_currency_code" => $invoicedAmountData["currency"]["code"]
-                    );
-                    array_push($whmcsClientsToAutoInvoice, $clientToAutoInvoice);
-                    $creditAutoInvoicedCount = $creditAutoInvoicedCount + 1;
-                } catch ( Exception $e ) {
-                    logActivity($e->getMessage());
-                    continue;
+            $retrievedClients = $clientsToAutoInvoiceResponse['objects'];
+            
+            $urlProcessAutoInvoicing = "/billing/external-billing/process_clients_for_credit_auto_invoicing";
+            $counter = 0;
+            $creditAutoInvoicedCount = 0;
+            foreach($retrievedClients AS $retrievedClientUUID) {
+                $counter = $counter + 1;
+                if ($creditAutoInvoicedCount === 0) {
+                    // re-set array as we process 20 clients at a time
+                    $whmcsClientsToAutoInvoice = [];
+                    $urlParams = array();
                 }
-            }
 
-            if ($creditAutoInvoicedCount === 20 || $counter === count($retrievedClients)) {
-                // if we reached 20 clients or the end of list, send them to fleio
-                $creditAutoInvoicedCount = 0;
-                // process clients we found
-                $urlParams = array(
-                    "clients" => $whmcsClientsToAutoInvoice
-                );
-                try {
-                    $clientsToAutoInvoice = $flApi->post($urlProcessAutoInvoicing, $urlParams);
-                } catch ( Exception $e ) {
-                    logActivity($e->getMessage());
-                    continue;
-                }
-                foreach ($clientsToAutoInvoice["objects"] as $clientToAutoInvoice) {
+                // compose data that has to be sent to Fleio (already invoiced but unpaid amount)
+                $clientFromUUID = FleioUtils::getUUIDClient($retrievedClientUUID);
+                if ($clientFromUUID !== NULL) {
                     try {
-                        $clientFromUUID = FleioUtils::getUUIDClient($clientToAutoInvoice['external_billing_id']);
-                        if ($clientFromUUID != NULL) {
-                            try {
-                                $generatedInvoiceId = FleioUtils::invoiceClientByAmount(
-                                    $clientFromUUID,
-                                    $clientToAutoInvoice["necessary_credit"],
-                                    $clientToAutoInvoice["necessary_credit_currency"],
-                                    $server->configoption14,
-                                    FleioUtils::getFleioProductsInvoicedAmount($clientFromUUID->id, $server->id)
-                                );
-                            } catch ( Exception $e ) {
-                                logActivity(
-                                    'Fleio: error when trying to invoice client ' .
-                                    $clientToAutoInvoice['external_billing_id'] . ': ' . $e->getMessage()
-                                );
-                                $generatedInvoiceId = NULL;
-                            }
-                            if ($generatedInvoiceId) {
-                                $clientHasBillingAgreementResponse = FleioUtils::clientHasBillingAgreement(
-                                    $clientFromUUID->id,
-                                    $server->configoption13
-                                );
-                                $clientHasBillingAgreement = $clientHasBillingAgreementResponse['hasAgreement'];
-                                if ($capturePaymentImmediately && $clientHasBillingAgreement) {
-                                    $captured = FleioUtils::captureInvoicePayment($generatedInvoiceId);
-                                    if ($captured === false && $server->configoption16 === '1') {
-                                        // capture failed and setting says the client is no more on agreement
-                                        FleioUtils::removeClientBillingAgreement(
-                                            $flApi, $clientToAutoInvoice['external_billing_id']
-                                        );
-                                    }
-                                }
-                            }
-                        } else {
-                            logActivity(
-                                'Fleio: unable to retrieve WHMCS client with UUID: ' .
-                                $clientToAutoInvoice['external_billing_id']
-                            );
-                        }
+                        $invoicedAmountData = FleioUtils::getFleioProductsInvoicedAmount($clientFromUUID->id, $server->id);
+                        $clientToAutoInvoice = array(
+                            "external_billing_id" => $retrievedClientUUID, 
+                            "credit_still_to_be_paid" => $invoicedAmountData["amount"],
+                            "credit_still_to_be_paid_currency_code" => $invoicedAmountData["currency"]["code"]
+                        );
+                        array_push($whmcsClientsToAutoInvoice, $clientToAutoInvoice);
+                        $creditAutoInvoicedCount = $creditAutoInvoicedCount + 1;
                     } catch ( Exception $e ) {
                         logActivity($e->getMessage());
                         continue;
+                    }
+                }
+
+                if ($creditAutoInvoicedCount === 20 || $counter === count($retrievedClients)) {
+                    // if we reached 20 clients or the end of list, send them to fleio
+                    $creditAutoInvoicedCount = 0;
+                    // process clients we found
+                    $urlParams = array(
+                        "clients" => $whmcsClientsToAutoInvoice
+                    );
+                    try {
+                        $clientsToAutoInvoice = $flApi->post($urlProcessAutoInvoicing, $urlParams);
+                    } catch ( Exception $e ) {
+                        logActivity($e->getMessage());
+                        continue;
+                    }
+                    foreach ($clientsToAutoInvoice["objects"] as $clientToAutoInvoice) {
+                        try {
+                            $clientFromUUID = FleioUtils::getUUIDClient($clientToAutoInvoice['external_billing_id']);
+                            if ($clientFromUUID != NULL) {
+                                try {
+                                    $generatedInvoiceId = FleioUtils::invoiceClientByAmount(
+                                        $clientFromUUID,
+                                        $clientToAutoInvoice["necessary_credit"],
+                                        $clientToAutoInvoice["necessary_credit_currency"],
+                                        $server->configoption14,
+                                        FleioUtils::getFleioProductsInvoicedAmount($clientFromUUID->id, $server->id)
+                                    );
+                                } catch ( Exception $e ) {
+                                    logActivity(
+                                        'Fleio: error when trying to invoice client ' .
+                                        $clientToAutoInvoice['external_billing_id'] . ': ' . $e->getMessage()
+                                    );
+                                    $generatedInvoiceId = NULL;
+                                }
+                                if ($generatedInvoiceId) {
+                                    $clientHasBillingAgreementResponse = FleioUtils::clientHasBillingAgreement(
+                                        $clientFromUUID->id,
+                                        $server->configoption13
+                                    );
+                                    $clientHasBillingAgreement = $clientHasBillingAgreementResponse['hasAgreement'];
+                                    if ($capturePaymentImmediately && $clientHasBillingAgreement) {
+                                        $captured = FleioUtils::captureInvoicePayment($generatedInvoiceId);
+                                        if ($captured === false && $server->configoption16 === '1') {
+                                            // capture failed and setting says the client is no more on agreement
+                                            FleioUtils::removeClientBillingAgreement(
+                                                $flApi, $clientToAutoInvoice['external_billing_id']
+                                            );
+                                        }
+                                    }
+                                }
+                            } else {
+                                logActivity(
+                                    'Fleio: unable to retrieve WHMCS client with UUID: ' .
+                                    $clientToAutoInvoice['external_billing_id']
+                                );
+                            }
+                        } catch ( Exception $e ) {
+                            logActivity($e->getMessage());
+                            continue;
+                        }
                     }
                 }
             }
