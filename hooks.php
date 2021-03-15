@@ -38,7 +38,8 @@ function fleio_PostCronjob() {
             $server->configoption13,
             $server->configoption15,
             $server->configoption16,
-            $capturePaymentImmediately
+            $capturePaymentImmediately,
+            $server
         );
         $url = "/clients/get_clients_to_invoice";
         $urlParams = array(
@@ -104,7 +105,7 @@ function fleio_PostCronjob() {
                                     $numInvoicedClients += 1;
                                     // TODO: take billing agreement status of client from fleio response from fleio 2020.03
                                     $clientHasBillingAgreementResponse = FleioUtils::clientHasBillingAgreement(
-                                        $clientFromUUID->id,
+                                        $clientFromUUID,
                                         $server->configoption13
                                     );
                                     $clientHasBillingAgreement = $clientHasBillingAgreementResponse['hasAgreement'];
@@ -229,7 +230,7 @@ function fleio_PostCronjob() {
                                 }
                                 if ($generatedInvoiceId) {
                                     $clientHasBillingAgreementResponse = FleioUtils::clientHasBillingAgreement(
-                                        $clientFromUUID->id,
+                                        $clientFromUUID,
                                         $server->configoption13
                                     );
                                     $clientHasBillingAgreement = $clientHasBillingAgreementResponse['hasAgreement'];

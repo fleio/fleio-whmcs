@@ -233,15 +233,17 @@ class FleioUtils {
         return $isConsidered;
     }
 
-    public static function clientHasBillingAgreement($clientId, $validGatewayNames) {
+    public static function clientHasBillingAgreement($client, $validGatewayNames) {
         // checks if client payment method is suitable for billing agreements based on its gateway name
         // also checks if client has a fleio related invoice with status of paid
+        $clientId = $client->id;
         $hasAgreement = false;
         $gatewayNames = array();
-        $payMethods = localAPI('GetPayMethods', array('clientid' => $clientId));
-        if ($payMethods && $payMethods['paymethods']) {
-            if (sizeof($payMethods['paymethods'])) {
-                foreach($payMethods['paymethods'] AS $payMethod) {
+        $results = localAPI('GetPayMethods', array('clientid' => $clientId));
+        $relevantResponse = true;
+        if ($results && $results['result'] == 'success') {
+            if ($results['paymethods'] && sizeof($results['paymethods'])) {
+                foreach($results['paymethods'] AS $payMethod) {
                     if ($payMethod['remote_token'] && !(is_null($payMethod['remote_token']))
                         && !(empty($payMethod['remote_token']))) {
                         $payMethodHasAgreement = self::autoPayConsidered(
@@ -255,11 +257,30 @@ class FleioUtils {
                     }
                 }
             }
+            if ($hasAgreement) {
+                // check if client has a paid invoice related to fleio
+                $hasAgreement = self::clientHasPaidFleioRelatedInvoice($clientId);
+            }
+            if ($hasAgreement) {
+                // check on paymentmethod client field
+                foreach(FleioUtils::$gateway_name_prefix_to_gateway_map AS $key => $gateway) {
+                    foreach ($gatewayNames AS $gatewayWithAgreementName) {
+                        if (substr($gatewayWithAgreementName, 0, strlen($key)) === $key) {
+                            $hasAgreement = FleioUtils::$gateway_name_prefix_to_gateway_map[$key] === $client->paymentmethod;
+                            break;
+                        }
+                    }
+                };
+            }
+        } else {
+            // cannot determine on agreement status if this fails
+            $relevantResponse = false;
         }
-        if ($hasAgreement) {
-            $hasAgreement = self::clientHasPaidFleioRelatedInvoice($clientId);
-        }
-        return array('hasAgreement' => $hasAgreement, 'gatewayNames' => $gatewayNames);
+        return array(
+            'hasAgreement' => $hasAgreement,
+            'gatewayNames' => $gatewayNames,
+            'relevantResponse' => $relevantResponse
+        );
     }
 
     public static function getFleioProductsInvoicedAmount($clientId, $fleioPackageId) {
@@ -307,8 +328,86 @@ class FleioUtils {
             }
         }
     }
+    
+    public static function processUnpaidInvoices($fleioServer, $client, $retryChargesEveryXHours, $removeAgreementStatusAfterXFailedCharges) {
+        // this has to start with the assumption client is on agreement
+        // if unpaid invoices exists and settings says to remove agreement status after charge attempts, do so
+        $hasAgreement = true;
+        $clientProd = Capsule::table('tblhosting AS th')
+                        ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
+                        ->where('tp.id', '=', $fleioServer->id)
+                        ->where('th.domainstatus', '=', 'Active')
+                        ->where('th.userid', '=', $client->id)
+                        ->where('tp.servertype', '=', 'fleio')
+                        ->select('th.*')
+                        ->first();
+                 
+        if ($clientProd) {
+            $invoiceItems = Capsule::table('tblinvoiceitems')
+                                ->join('tblclients AS tc', 'tc.id', '=', 'tblinvoiceitems.userid')
+                                ->join('tblhosting', 'tblinvoiceitems.relid', '=', 'tblhosting.id')
+                                ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
+                                ->where('tblinvoiceitems.userid', '=', $client->id)
+                                ->where('tblinvoiceitems.relid', '=', $clientProd->id)
+                                ->where('tblproducts.servertype', '=', 'fleio')
+                                ->select('tblinvoiceitems.invoiceid')
+                                ->get();
 
-    public static function updateClientsBillingAgreement($flApi, $status='Active', $includeGatewaysWithName='', $retryChargesEveryXHours='0', $removeAgreementStatusAfterXFailedCharges='0', $capturePaymentImmediately) {
+            foreach($invoiceItems AS $invoiceItem) {
+                $invoice = Capsule::table('tblinvoices')
+                            ->where('id', '=', $invoiceItem->invoiceid)
+                            ->select(
+                                'tblinvoices.status',
+                                'tblinvoices.id',
+                                'tblinvoices.last_capture_attempt'
+                            )
+                            ->first();
+                if ($invoice && $invoice->status === 'Unpaid') {
+                    if ($invoice->last_capture_attempt === '0000-00-00 00:00:00') {
+                        $captured = self::captureInvoicePayment($invoice->id);
+                        if ($captured === false && $removeAgreementStatusAfterXFailedCharges === '1') {
+                            $hasAgreement = false;
+                            break;
+                        }
+                    } else {
+                        if ($removeAgreementStatusAfterXFailedCharges === '1' ||
+                            $invoice->last_capture_attempt === '2000-01-01 00:00:00') {
+                            // if last capture attempt is set to '2000-01-01 00:00:00' it means
+                            // this already failed the second time and agreement removal was set at 2
+                            $hasAgreement = false;
+                            break;
+                        }
+                        $secondsPassedSinceLastCaptureAttempt = time() - strtotime(
+                            $invoice->last_capture_attempt
+                        );
+                        $hoursSinceLastCaptureAttempt = floor(
+                            $secondsPassedSinceLastCaptureAttempt / 3600
+                        );
+                        if ($hoursSinceLastCaptureAttempt >= (int)$retryChargesEveryXHours) {
+                            // Retry payment. If this fails again, set last_capture_attempt to now
+                            // and retry in a future time if needed.
+                            $captured = self::captureInvoicePayment($invoice->id);
+                            if ($captured === false &&
+                                $removeAgreementStatusAfterXFailedCharges === '2') {
+                                $hasAgreement = false;
+                                Capsule::table('tblinvoices')
+                                    ->where('id', '=', $invoice->id)
+                                    ->update(['last_capture_attempt' => date(
+                                        "Y-m-d H:i:s", strtotime('2000-01-01 00:00:00')
+                                    )]);
+                                // set this date so we know it failed at least the second time
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return $hasAgreement;
+    }
+
+    public static function updateClientsBillingAgreement($flApi, $status='Active', $includeGatewaysWithName='', $retryChargesEveryXHours='0',
+                                                         $removeAgreementStatusAfterXFailedCharges='0', $capturePaymentImmediately, $fleioServer) {
         logActivity('Fleio: update all clients billing agreements');
         try {
             $clients = Capsule::table('tblhosting AS th')
@@ -323,101 +422,26 @@ class FleioUtils {
         }
         $agreements = [];
         foreach($clients AS $client) {
-            $hasAgreementResponse = self::clientHasBillingAgreement($client->id, $includeGatewaysWithName);
+            $hasAgreementResponse = self::clientHasBillingAgreement($client, $includeGatewaysWithName);
             $hasAgreement = $hasAgreementResponse['hasAgreement'];
-            $gatewaysWithAgreementNames = $hasAgreementResponse['gatewayNames'];
-            if ($hasAgreement) {
-                // TODO: move this piece of code in the clientHasBillingAgreement function
-                foreach(FleioUtils::$gateway_name_prefix_to_gateway_map AS $key => $gateway) {
-                    foreach ($gatewaysWithAgreementNames AS $gatewayWithAgreementName) {
-                        if (substr($gatewayWithAgreementName, 0, strlen($key)) === $key) {
-                            $hasAgreement = FleioUtils::$gateway_name_prefix_to_gateway_map[$key] === $client->paymentmethod;
-                            break;
-                        }
-                    }
-                };
-            }
-            if ($hasAgreement === true && $capturePaymentImmediately) {
-            // Further check if client really is on agreement. Retry charges for his unpaid invoices if this setting is active,
-            // Remove agreement status if auto-pay failed x times (defined in module settings)
-            if ($retryChargesEveryXHours !== NULL && $retryChargesEveryXHours !== '0' && $retryChargesEveryXHours !== '') {
-                $fleioServers = self::getFleioProducts();
-                foreach($fleioServers as $server) {
-                    $clientProd = Capsule::table('tblhosting AS th')
-                                    ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
-                                    ->where('tp.id', '=', $server->id)
-                                    ->where('th.domainstatus', '=', 'Active')
-                                    ->where('th.userid', '=', $client->id)
-                                    ->where('tp.servertype', '=', 'fleio')
-                                    ->select('th.*')
-                                    ->first();
-                             
-                    if ($clientProd) {
-                        $invoiceItems = Capsule::table('tblinvoiceitems')
-                                            ->join('tblclients AS tc', 'tc.id', '=', 'tblinvoiceitems.userid')
-                                            ->join('tblhosting', 'tblinvoiceitems.relid', '=', 'tblhosting.id')
-                                            ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
-                                            ->where('tblinvoiceitems.userid', '=', $client->id)
-                                            ->where('tblinvoiceitems.relid', '=', $clientProd->id)
-                                            ->where('tblproducts.servertype', '=', 'fleio')
-                                            ->select('tblinvoiceitems.invoiceid')
-                                            ->get();
-
-                            foreach($invoiceItems AS $invoiceItem) {
-                                $invoice = Capsule::table('tblinvoices')
-                                            ->where('id', '=', $invoiceItem->invoiceid)
-                                            ->select(
-                                                'tblinvoices.status',
-                                                'tblinvoices.id',
-                                                'tblinvoices.last_capture_attempt'
-                                            )
-                                            ->first();
-                                if ($invoice && $invoice->status === 'Unpaid') {
-                                    if ($invoice->last_capture_attempt === '0000-00-00 00:00:00') {
-                                        $captured = self::captureInvoicePayment($invoice->id);
-                                        if ($captured === false && $removeAgreementStatusAfterXFailedCharges === '1') {
-                                            $hasAgreement = false;
-                                            break;
-                                        }
-                                    } else {
-                                        if ($removeAgreementStatusAfterXFailedCharges === '1' ||
-                                            $invoice->last_capture_attempt === '2000-01-01 00:00:00') {
-                                            // if last capture attempt is set to '2000-01-01 00:00:00' it means
-                                            // this already failed the second time and agreement removal was set at 2
-                                            $hasAgreement = false;
-                                            break;
-                                        }
-                                        $secondsPassedSinceLastCaptureAttempt = time() - strtotime(
-                                            $invoice->last_capture_attempt
-                                        );
-                                        $hoursSinceLastCaptureAttempt = floor(
-                                            $secondsPassedSinceLastCaptureAttempt / 3600
-                                        );
-                                        if ($hoursSinceLastCaptureAttempt >= (int)$retryChargesEveryXHours) {
-                                            // Retry payment. If this fails again, set last_capture_attempt to now
-                                            // and retry in a future time if needed.
-                                            $captured = self::captureInvoicePayment($invoice->id);
-                                            if ($captured === false &&
-                                                $removeAgreementStatusAfterXFailedCharges === '2') {
-                                                $hasAgreement = false;
-                                                Capsule::table('tblinvoices')
-                                                    ->where('id', '=', $invoice->id)
-                                                    ->update(['last_capture_attempt' => date(
-                                                        "Y-m-d H:i:s", strtotime('2000-01-01 00:00:00')
-                                                    )]);
-                                                // set this date so we know it failed at least the second time
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+            $relevantResponse = $hasAgreementResponse['relevantResponse'];
+            if ($relevantResponse === true && $hasAgreement === true && $capturePaymentImmediately) {
+                // Further check to see if client really is on agreement. Retry charges for his unpaid invoices if this setting is active,
+                // Remove agreement status if auto-pay failed x times (defined in module settings)
+                if ($retryChargesEveryXHours !== NULL && $retryChargesEveryXHours !== '0' && $retryChargesEveryXHours !== '') {
+                    $hasAgreement = self::processUnpaidInvoices(
+                        $fleioServer,
+                        $client,
+                        $retryChargesEveryXHours,
+                        $removeAgreementStatusAfterXFailedCharges
+                    );
                 }
             }
-            $clientAgreement = array("uuid" => $client->uuid, "agreement" => $hasAgreement);
-            array_push($agreements, $clientAgreement);
+            if ($relevantResponse === true) {
+                // update client agreement status only if we know that the check is relevant
+                $clientAgreement = array("uuid" => $client->uuid, "agreement" => $hasAgreement);
+                array_push($agreements, $clientAgreement);
+            }
         };
         if (sizeof($agreements)) {
             $url = '/clients/set_billing_agreements';
