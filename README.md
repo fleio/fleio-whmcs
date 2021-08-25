@@ -143,6 +143,8 @@ At the end of the billing cycle it will be issued an invoice of 1 USD.
 Additional notes
 ================
 
+The module won't work with more than one Fleio product defined (connected to 2 Fleio installations for example).
+
 Any WHMCS automated billing will not work as expected and is not recommended.
 Instead you should use the Fleio billing system to calculate usage for clients and to require them to pay invoices or add credit.
 To achieve this, you can set the product as free or set a one time payment requirement in WHMCS.
