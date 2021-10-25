@@ -28,36 +28,39 @@ function fleio_PostCronjob() {
         $invoiceWithAgreement = $server->configoption11 == 'on' ? true : false; // invoice clients with billing agreement
         $invoiceWithoutAgreement = $server->configoption10 == 'on' ? true : false;    // invoice clients without billing agreement
         $capturePaymentImmediately = $server->configoption12 == 'on' ? true : false; // Attempt to capture payment immediately
-        if ($invoiceWithAgreement && $invoiceWithoutAgreement) {
-            logActivity('Fleio: Looking at clients with and without a billing agreement');
-        };
+        $usingInvoicingFeature = $invoiceWithAgreement || $invoiceWithoutAgreement;
         $flApi = new FlApi($server->configoption4, $server->configoption1);
-        FleioUtils::updateClientsBillingAgreement(
-            $flApi,
-            'Active',
-            $server->configoption13,
-            $server->configoption15,
-            $server->configoption16,
-            $capturePaymentImmediately,
-            $server
-        );
-        $url = "/clients/get_clients_to_invoice";
-        $urlParams = array(
-            "has_external_billing" => 'True', // only clients with external billing set and credit less than 0
-            "uptodate_credit_max" => 0
-        );
-        if ($invoiceWithAgreement && !$invoiceWithoutAgreement) {
-            // Filter only Clients with billing agreement
-            $urlParams['has_billing_agreement'] = 'True';
-            logActivity('Fleio: Looking at clients with billing agreements only');
-        };
-        if (!$invoiceWithAgreement && $invoiceWithoutAgreement) {
-            // Filter only Clients without billing agreement
-            $urlParams['has_billing_agreement'] = 'False';
-            logActivity('Fleio: Looking at clients without a billing agreement only');
-        };
+        if ($usingInvoicingFeature) {
+            FleioUtils::updateClientsBillingAgreement(
+                $flApi,
+                'Active',
+                $server->configoption13,
+                $server->configoption15,
+                $server->configoption16,
+                $capturePaymentImmediately,
+                $server
+            );
 
-        if ($invoiceWithAgreement || $invoiceWithoutAgreement) {
+            $url = "/clients/get_clients_to_invoice";
+            $urlParams = array(
+                "has_external_billing" => 'True', // only clients with external billing set and credit less than 0
+                "uptodate_credit_max" => 0
+            );
+
+            if ($invoiceWithAgreement && $invoiceWithoutAgreement) {
+                logActivity('Fleio: Looking at clients with and without a billing agreement');
+            }
+            if ($invoiceWithAgreement && !$invoiceWithoutAgreement) {
+                // Filter only Clients with billing agreement
+                $urlParams['has_billing_agreement'] = 'True';
+                logActivity('Fleio: Looking at clients with billing agreements only');
+            }
+            if (!$invoiceWithAgreement && $invoiceWithoutAgreement) {
+                // Filter only Clients without billing agreement
+                $urlParams['has_billing_agreement'] = 'False';
+                logActivity('Fleio: Looking at clients without a billing agreement only');
+            }
+
             logActivity('Fleio: retrieving all overdue clients');
             try {
                 $invoiceOnlyInEndOfCycleTimespan = $server->configoption19 == 'on' ? true : false; // invoice clients only 
@@ -157,7 +160,7 @@ function fleio_PostCronjob() {
 
         FleioUtils::markWhmcsActiveServices($server->configoption4, $flApi);
 
-        if ($invoiceWithAgreement || $invoiceWithoutAgreement) {
+        if ($usingInvoicingFeature) {
             $urlGetAutoInvoiceClients = '/billing/external-billing/get_clients_to_auto_invoice_for_external_billing';
             try {
                 $clientsToAutoInvoiceResponse = $flApi->get($urlGetAutoInvoiceClients);
