@@ -734,4 +734,8 @@ class FleioUtils {
         }
     }
 
+    public static function trimApiUrlTrailingSlash($url) {
+        return rtrim($url,"/");
+    }
+
 }

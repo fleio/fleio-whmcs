@@ -4,6 +4,8 @@ if (!defined("WHMCS")) {
     die("This file cannot be accessed directly");
 }
 
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'utils.php';
+
 use Illuminate\Database\Capsule\Manager as Capsule;
 
 class FlApiException extends Exception {}
@@ -22,7 +24,7 @@ class Fleio {
 
     public static function fromParams(array $params) {
         $server = new stdClass;
-        $server->url = $params['configoption4'];
+        $server->url = FleioUtils::trimApiUrlTrailingSlash($params['configoption4']);
         $server->frontend_url = $params['configoption2'];
         $server->token = $params['configoption1'];
         $server->userPrefix = !empty(trim($params['configoption9'])) ? trim($params['configoption9']) : 'whmcs';
@@ -45,7 +47,7 @@ class Fleio {
             ->select('tblproducts.configoption1', 'tblproducts.configoption2', 'tblproducts.configoption4', 'tblproducts.configoption8', 'tblproducts.configoption9', 'tblproducts.configoption10', 'tblproducts.configoption11')
             ->where('tblhosting.id', '=', $prodid)->first();
         $server = new stdClass;
-        $server->url = $dbserver->configoption4;
+        $server->url = FleioUtils::trimApiUrlTrailingSlash($dbserver->configoption4);
         $server->frontend_url = $dbserver->configoption2;
         $server->token = $dbserver->configoption1;
         $server->userPrefix = !empty(trim($dbserver->configoption9)) ? trim($dbserver->configoption9) : 'whmcs';

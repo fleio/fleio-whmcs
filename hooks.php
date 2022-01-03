@@ -29,7 +29,7 @@ function fleio_PostCronjob() {
         $invoiceWithoutAgreement = $server->configoption10 == 'on' ? true : false;    // invoice clients without billing agreement
         $capturePaymentImmediately = $server->configoption12 == 'on' ? true : false; // Attempt to capture payment immediately
         $usingInvoicingFeature = $invoiceWithAgreement || $invoiceWithoutAgreement;
-        $flApi = new FlApi($server->configoption4, $server->configoption1);
+        $flApi = new FlApi(FleioUtils::trimApiUrlTrailingSlash($server->configoption4), $server->configoption1);
         if ($usingInvoicingFeature) {
             FleioUtils::updateClientsBillingAgreement(
                 $flApi,
