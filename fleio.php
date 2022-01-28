@@ -6,6 +6,7 @@ if (!defined("WHMCS")) {
 
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'api.php';
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'utils.php';
+use Illuminate\Database\Capsule\Manager as Capsule;
 
 function fleio_MetaData()
 {
@@ -330,14 +331,16 @@ function actionOverview($params, $request) {
 
     $uptodateCredit = NULL;
     $outofcreditDatetime = NULL;
-    $fleioClientCurrency = NULL;
     $whmcsClientCurrency = getCurrency($params['clientsdetails']['userid']);
     if (is_array($client) && array_key_exists('uptodate_credit', $client) && array_key_exists('outofcredit_datetime', $client)) {
         $uptodateCredit = $client['uptodate_credit'];
         $outofcreditDatetime = $client['outofcredit_datetime'];
-        $fleioClientCurrency = getCurrency($client['currency']);
+        $whmcsCurrency = Capsule::table('tblcurrencies')
+            ->select('id', 'code')
+            ->where('code', '=', $client['currency'])
+            ->first();
         try {
-          $uptodateCreditFormatted = formatCurrency($uptodateCredit, $fleioClientCurrency['id']);
+          $uptodateCreditFormatted = formatCurrency($uptodateCredit, $whmcsCurrency->id);
         } catch (Exception $e) { 
           $uptodateCreditFormatted = '' . $uptodateCredit; 
         }
