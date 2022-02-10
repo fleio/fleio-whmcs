@@ -578,9 +578,12 @@ function endUserDashboardCustomization(MenuItem $homePagePanels) {
                 array_key_exists('outofcredit_datetime', $client)) {
                 $uptodateCredit = $client['uptodate_credit'];
                 $negativeCredit = $uptodateCredit < 0;
-                $fleioClientCurrency = getCurrency($client['currency']);
+                $whmcsCurrency = Capsule::table('tblcurrencies')
+                    ->select('id', 'code')
+                    ->where('code', '=', $client['currency'])
+                    ->first();
                 try {
-                  $uptodateCreditFormatted = formatCurrency($uptodateCredit, $fleioClientCurrency['id']);
+                  $uptodateCreditFormatted = formatCurrency($uptodateCredit, $whmcsCurrency->id);
                 } catch (Exception $e) { 
                   $uptodateCreditFormatted = '' . $uptodateCredit; 
                 }
