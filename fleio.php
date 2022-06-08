@@ -84,7 +84,7 @@ function fleio_ConfigOptions() {
         "FriendlyName" => "Fleio username prefix",
         "Type" => "text",
         "Size" => "12",
-        "Description" => "Leave blank for 'whmcs'",
+        "Description" => "Leave blank for 'whmcs'. Warning: field will be removed in 2022.09.0 release.",
         "Default" => "whmcs",
     ),
     "issueinvoice" => array (
