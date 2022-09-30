@@ -152,8 +152,12 @@ To achieve this, you can set the product as free or set a one time payment requi
 It's really important to remember that when/if a WHMCS customer's currency is changed, the same operation needs to be done in Fleio and
 all Fleio client's services should be checked to have prices in the new currency set for the WHMCS client.
 
-If you're using the generate invoice feature of fleio-whmcs, automatic settlements and invoice generation settings have 
-to be disabled.
+If you're using invoice generation features of fleio-whmcs plugin, automatic settlements and invoice generation settings
+`have to be disabled in Fleio`. With this setup, in order to settle invoiced service cycles in Fleio (thus also adjusting
+client total credit in Fleio), you may make use of `Mark invoiced periods as paid when using external billing` setting
+from Configuration details / Billing cycles expandable row. This setting works as follows: all invoiced service cycles are
+settled if client has up to date credit greater than 0 after paying a fleio-whmcs invoice, otherwise settling invoiced cycles
+depends on their associated price and how much credit the client added.
 
 Partial refunds must be manually handled. The Fleio credit will not be modified if you partially refund an invoice in WHMCS
 
