@@ -233,10 +233,12 @@ class Fleio {
                     }
                 }
                 // get product data
-                $osClientsUrl = '/openstack/clients/';
+                $osServicesUrl = '/openstack/billing/services/';
                 $fleio_client_id = $this->getClientId();
                 try {
-                    $newServiceProductsResp = $this->flApi->get($osClientsUrl . $fleio_client_id . '/new_service_data', array());
+                    $newServiceProductsResp = $this->flApi->get($osServicesUrl . 'new_service_data', array(
+                        "client_id" => $fleio_client_id
+                    ));
                     $newServiceProducts = $newServiceProductsResp["products"];
                     $newServiceProductId = $newServiceProducts[0]["id"];
                     $newServiceCycleId = $newServiceProducts[0]["cycles"][0]["id"];
@@ -247,7 +249,8 @@ class Fleio {
                 }
                 // create new service
                 try {
-                    $this->flApi->post($osClientsUrl . $fleio_client_id . '/create_openstack_service', array(
+                    $this->flApi->post($osServicesUrl . 'create_openstack_service', array(
+                        "client_id" => $fleio_client_id,
                         "product_id" => $newServiceProductId,
                         "product_cycle_id" => $newServiceCycleId,
                         "service_external_id" => $serviceId,
