@@ -187,7 +187,7 @@ class Fleio {
             // TODO: update user if necessary
             // Resume user
             try {
-                $relatedUser = $this->getUser();
+                $relatedUser = $this->getUser($this->clientsdetails->uuid);
             } catch (Exception $e) {
                 $relatedUser = NULL;
             }
@@ -275,20 +275,19 @@ class Fleio {
         return $this->flApi->patch($url, $details);
     }
 
-    public function getUser() {
-        $clientUsername = $this->SERVER->userPrefix ? $this->SERVER->userPrefix . $this->clientsdetails->userid : 'whmcs' . $this->clientsdetails->userid;
+    public function getUser($clientUUID) {
         $url = '/users';
-        $query_params = array('username' => $clientUsername);
+        $query_params = array('external_billing_id' => (string)$clientUUID);
         $response = $this->flApi->get($url, $query_params);
         if ($response == null) {
-            throw new FlApiRequestException("Unable to retrieve the Fleio user with username: " . $clientUsername, 400);
+            throw new FlApiRequestException("Unable to retrieve Fleio user with external billing id: " . (string)$clientUUID, 400);
         }
         $objects = $response['objects'];
         if (count($objects) > 1) {
-            throw new FlApiRequestException("Unable to retrieve the Fleio user with username: " . $clientUsername, 409); // Multiple objects returned
+            throw new FlApiRequestException("Unable to retrieve Fleio user with external billing id: " . (string)$clientUUID, 409); // Multiple objects returned
         }
         if (count($objects) == 0) {
-           throw new FlApiRequestException("Unable to retrieve the Fleio user with username: " . $clientUsername, 404); // Not found
+           throw new FlApiRequestException("Unable to retrieve Fleio user with external billing id: " . (string)$clientUUID, 404); // Not found
         }
         return $objects[0];
     }
@@ -466,7 +465,7 @@ class Fleio {
             }
             // de-activate user
             try {
-                $relatedUser = $this->getUser();
+                $relatedUser = $this->getUser($this->clientsdetails->uuid);
             } catch (Exception $e) {
                 $relatedUser = NULL;
             }
@@ -636,4 +635,3 @@ class FlApi {
         return $decoded_result;
     }
 }
-
