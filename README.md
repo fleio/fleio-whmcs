@@ -10,6 +10,8 @@ enables service providers to sell public cloud services.
 ## Requirements
 * WHMCS 7.x
 * Requires PHP 7.x
+* Fleio WHMCS module version 2.0.0 requires Fleio versions 2022.11 and higher
+* Fleio WHMCS module version 1.0.0 works with Fleio versions up to and including 2022.10
 
 
 ## Installation
@@ -17,16 +19,16 @@ enables service providers to sell public cloud services.
 
 1. Copy the source files to the WHMCS installation directory in `modules/servers/fleio`
 2. Move `WHMCS_INSTALL_DIR/modules/servers/fleio/fleioaddcredit.php` to `WHMCS_INSTALL_DIR/fleioaddcredit.php`
-2. Move `WHMCS_INSTALL_DIR/modules/servers/fleio/accesscloudcontrolpanel.php` to `WHMCS_INSTALL_DIR/accesscloudcontrolpanel.php`
-3. Login to WHMCS as admin and create a new product from: `Setup -> Product/Services -> Product/Services -> Create New Product`
-4. Under Module Settings on the new product page, select the `Fleio` module
-5. Retrieve a token from Fleio (after logging in as admin in backend (/backend/admin) -> Tokens -> Add Token for a staff user) 
+3. Move `WHMCS_INSTALL_DIR/modules/servers/fleio/accesscloudcontrolpanel.php` to `WHMCS_INSTALL_DIR/accesscloudcontrolpanel.php`
+4. Login to WHMCS as admin and create a new product from: `Setup -> Product/Services -> Product/Services -> Create New Product`
+5. Under Module Settings on the new product page, select the `Fleio` module
+6. Retrieve a token from Fleio (after logging in as admin in backend (/backend/admin) -> Tokens -> Add Token for a staff user) 
     and add it to the WHMCS module in module settings
-6. Set the frontend public urls for user and admin
-7. Set the backend public url (eg: http://server_hostname/staffapi)
-8. Set the Maximum and Minimum amounts (these are used to limit the amount a user can pay for a service)
-9. Make sure that WHMCS and Fleio have the same currencies
-10. In case a Configuration name and Group name is set in WHMCS Module Settings, make sure Fleio has the same Configuration and Client Group names.
+7. Set the frontend public urls for user and admin
+8. Set the backend public url (eg: http://server_hostname/staffapi)
+9. Set the Maximum and Minimum amounts (these are used to limit the amount a user can pay for a service)
+10. Make sure that WHMCS and Fleio have the same currencies
+11. In case a Configuration name and Group name is set in WHMCS Module Settings, make sure Fleio has the same Configuration and Client Group names.
     
     The Client Group name can be set through the /backend/admin/ at `Fleio core app` -> `Client groups`
 
