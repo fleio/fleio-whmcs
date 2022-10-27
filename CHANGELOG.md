@@ -3,7 +3,7 @@ v2.0.0
 
 https://github.com/fleio/fleio-whmcs/tree/2.0.0
 
-Release date: 2022-11-xx
+Release date: 2022-11-01
 
 ### Added
 
