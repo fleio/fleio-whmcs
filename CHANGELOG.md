@@ -38,6 +38,21 @@ Release date: 2022-11-01
 
 * Requires Fleio versions 2022.11 and higher
 
+v1.0.1
+======
+
+https://github.com/fleio/fleio-whmcs/tree/1.0.1
+
+Release date: 2022-11-01
+
+### Fixed
+
+* [fix] #81 API request filter by removed field GET /staffapi/users?username=whmcs76
+
+### Notes
+
+* Works with Fleio versions up to and including 2022.10
+
 v1.0.0
 ======
 
