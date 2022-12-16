@@ -164,7 +164,7 @@ class Fleio {
                  "phone" => $this->clientsdetails->phonenumber);
             try {
                 // update client details
-                $this->updateFleioClient($updatedDetails);
+                $this->updateFleioClient($updatedDetails, $existentClient['id']);
             } catch (Exception $e) {
                 logActivity(
                     'Could not update client ' . 
@@ -176,8 +176,7 @@ class Fleio {
             // resume client if necessary
             if ($existentClient["status"] !== "active") {
                 logActivity('Fleio: Resuming client ' . $this->clientsdetails->uuid . ' before running create on his existing service.');
-                $fleio_client_id = $this->getClientId();
-                $url = '/clients/' . $fleio_client_id . '/resume';
+                $url = '/clients/' . $existentClient['id'] . '/resume';
                 try {
                     $this->flApi->post($url);
                 } catch (Exception $e) {
@@ -234,10 +233,9 @@ class Fleio {
                 }
                 // get product data
                 $osServicesUrl = '/openstack/billing/services/';
-                $fleio_client_id = $this->getClientId();
                 try {
                     $newServiceProductsResp = $this->flApi->get($osServicesUrl . 'new_service_data', array(
-                        "client_id" => $fleio_client_id
+                        "client_id" => $existentClient['id']
                     ));
                     $newServiceProducts = $newServiceProductsResp["products"];
                     $newServiceProductId = $newServiceProducts[0]["id"];
@@ -250,7 +248,7 @@ class Fleio {
                 // create new service
                 try {
                     $this->flApi->post($osServicesUrl . 'create_openstack_service', array(
-                        "client_id" => $fleio_client_id,
+                        "client_id" => $existentClient['id'],
                         "product_id" => $newServiceProductId,
                         "product_cycle_id" => $newServiceCycleId,
                         "service_external_id" => $serviceId,
@@ -265,9 +263,11 @@ class Fleio {
         }
     }
 
-    public function updateFleioClient($details) {
+    public function updateFleioClient($details, $fleioClientId='') {
         // Update the Fleio Client details
-        $fleioClientId = $this->getClientId();
+        if (!$fleioClientId) {
+            $fleioClientId = $this->getClientId();
+        }
         $url = '/clients/'.$fleioClientId;
         return $this->flApi->patch($url, $details);
     }
