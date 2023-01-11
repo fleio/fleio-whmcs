@@ -1,3 +1,43 @@
+v2.0.1
+======
+
+https://github.com/fleio/fleio-whmcs/tree/2.0.1
+
+Release date: 2023-01-12
+
+### Added
+
+\-
+
+### Changed
+
+\-
+
+### Fixed
+
+* [fix] #80 Multiple unnecessary GET calls for client when creating OS service
+
+### Unreleased
+
+\-
+
+### Deprecated
+
+\-
+
+### Removed
+
+\-
+
+### Security
+
+\-
+
+### Notes
+
+* Requires Fleio versions 2022.11 and higher
+
+
 v2.0.0
 ======
 
