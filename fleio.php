@@ -412,7 +412,12 @@ function actionCreateInvoice($params, $request) {
     $values["itemamount1"] = $amount;
     $values["itemtaxed1"] = true;
 
-	$invoice_id = FleioUtils::createFleioInvoice($params['serviceid'], $values);
+    try {
+        $invoice_id = FleioUtils::createFleioInvoice($params['serviceid'], $values);
+    } catch (Exception $e) {
+        logActivity('Fleio: unable to create invoice for service ' . $params['serviceid'] . ': ' . $e->getMessage());
+        throw new Exception('Unable to create invoice');
+    }
 	$log_msg = "Fleio: User ID: ".$clientsdetails['userid']." created credit Invoice ID: ".$invoice_id." with amount ".formatCurrency($amount);
 	logActivity($log_msg);
 

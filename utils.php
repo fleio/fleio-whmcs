@@ -102,6 +102,38 @@ class FleioUtils {
         }
     }
 
+    private static function createServiceInvoice($serviceId, $invoiceData, $type) {
+        try {
+            $adminUsername = self::getWHMCSAdmin();
+        } catch (Exception $e) {
+            logActivity('Fleio: ' . $e->getMessage());
+            throw new Exception('Unable to create invoice');
+        }
+
+        $pdo = Capsule::connection()->getPdo();
+        $pdo->beginTransaction();
+        try {
+            $result = localAPI('CreateInvoice', $invoiceData, $adminUsername);
+            if ($result["result"] == "success") {
+                $invoice_id = $result['invoiceid'];
+                Capsule::table('tblinvoiceitems')
+                    ->where('invoiceid', (string) $invoice_id)
+                    ->update(array("type"=>$type, "relid"=>$serviceId));
+                if ($pdo->inTransaction()) {
+                    $pdo->commit();
+                }
+                return $invoice_id;
+            } else {
+                throw new Exception($result["message"]);
+            }
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw new Exception('Error creating invoice for service ID ' . $serviceId . ': ' . $e->getMessage());
+        }
+    }
+
     public static function createFleioInvoice($productId, $data, $type='Hosting') {
         # Helper to create an invoice for a Fleio product
         # Automatically calculate the date and duedate based on config
@@ -114,38 +146,17 @@ class FleioUtils {
             $dueDateTime->modify('+' . $duedays . ' day');
             $data['duedate'] = $dueDateTime->format('Y-m-d');
         }
-        // Get an admin username
-        try {
-            $adminUsername = self::getWHMCSAdmin();
-        } catch (Exception $e) {
-            logActivity('Fleio: ' . $e->getMessage());
-            throw new Exception('Unable to create invoice'); // We do not throw the original message since it may contain sensitive data
-        }
-        $result = localAPI('CreateInvoice', $data, $adminUsername);
-        if ($result["result"] == "success") {
-            $invoice_id = $result['invoiceid'];
-            Capsule::table('tblinvoiceitems')
-                ->where('invoiceid', (string) $invoice_id)
-                ->update(array("type"=>$type, "relid"=>$productId));
-            return $invoice_id;
-        } else {
-            throw new Exception($result["message"]);
-        }
+
+        return self::createServiceInvoice($productId, $data, $type);
     }
 
-    public static function createOverdueClientInvoice($clientId, $amount, $fleioServiceId, $invoicePaymentMethod=NULL, $type='Hosting') {
+    public static function createOverdueClientInvoice($clientId, $amount, $fleioServiceId, $invoicePaymentMethod=NULL) {
         // Calculate date and due date of invoice
         $dueDays = 0;
         $today = date('Y-m-d');
         $dueDate = new DateTime($today);
         $dueDate->modify('+' . $dueDays . ' day');
-        // Get an admin username, required to use local API
-        try {
-            $adminUsername = self::getWHMCSAdmin();
-        } catch (Exception $e) {
-            logActivity('Fleio: ' . $e->getMessage());
-            throw new Exception('Unable to create invoice'); // We do not throw the original message since it may contain sensitive data
-        }
+
         // Get the client Fleio product, to create an invoice for
         if (!$fleioServiceId) {
             throw new Exception('Fleio: unable to issue invoice for Client ID: ' . $clientId . ' since no OpenStack products found.');
@@ -162,16 +173,8 @@ class FleioUtils {
         if (!is_null($invoicePaymentMethod)) {
             $data['paymentmethod'] = $invoicePaymentMethod;
         }
-        $result = localAPI('CreateInvoice', $data, $adminUsername);
-        if ($result["result"] == "success") {
-            $invoice_id = $result['invoiceid'];
-            Capsule::table('tblinvoiceitems')
-                ->where('invoiceid', (string) $invoice_id)
-                ->update(array("type"=>$type, "relid"=>$fleioServiceId));
-            return $invoice_id;
-        } else {
-            throw new Exception($result["message"]);
-        }
+
+        return self::createServiceInvoice($fleioServiceId, $data, $type);
     }
 
     public static function clientHasPaidFleioRelatedInvoice($clientId) {
