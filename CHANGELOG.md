@@ -1,3 +1,43 @@
+v2.0.2
+======
+
+https://github.com/fleio/fleio-whmcs/tree/2.0.2
+
+Release date: 2023-02-20
+
+### Added
+
+\-
+
+### Changed
+
+* [change] #89 Use database transaction when generating invoices
+
+### Fixed
+
+\-
+
+### Unreleased
+
+\-
+
+### Deprecated
+
+\-
+
+### Removed
+
+\-
+
+### Security
+
+\-
+
+### Notes
+
+* Requires Fleio versions 2022.11 and higher
+
+
 v2.0.1
 ======
 
