@@ -10,7 +10,7 @@ enables service providers to sell public cloud services.
 ## Requirements
 * WHMCS 8.x, 7.8+
 * Requires PHP 7.x
-* Fleio WHMCS module version 2.0.0 requires Fleio versions 2022.11 and higher
+* Fleio WHMCS module version 2.0.x requires Fleio versions 2022.11 and higher
 * Fleio WHMCS module version 1.0.x works with Fleio versions up to and including 2022.10
 
 
@@ -43,7 +43,7 @@ The WHMCS module supports the following:
 * ability to create new invoices for Fleio credit
 * auto update of Fleio client details if WHMCS client is updated
 * auto update of Fleio client when he adds a billing agreement or CC in WHMCS
-   * you can filter the billing agreement ID prefix that leads to client marked as having a billing agreement in Fleio. For instance you can consider clients with a Stripe billing agreement ( prefix "cus_"), but not does with a PayPal billing agrement (prefix "B-").
+   * you can filter the billing agreement ID prefix that leads to client marked as having a billing agreement in Fleio. For instance, you can consider clients with a Stripe billing agreement ( prefix "cus_"), but not does with a PayPal billing agreement (prefix "B-").
 * auto issue of invoices for Fleio clients passing a certain amount in usage before the end of a month
 * auto issue of invoices for Fleio clients at the end of a month
 * auto charge attempt after an invoice is issued for clients with a billing agreement or CC on file
@@ -59,7 +59,7 @@ We have the following limit in WHMCS:
 *Do not invoice amount below*: 1 USD
 
 Also, we will have the following terms:
-* uninvoiced ussage: the difference between total usage and invoiced usage
+* uninvoiced usage: the difference between total usage and invoiced usage
 
 If *Invoice clients without billing agreement* is checked in the Fleio Module Settings in WHMCS, all clients that do not have a billing agreement or CC on file in WHMCS will be issued invoices as follows:
 
@@ -148,7 +148,7 @@ Additional notes
 The module won't work with more than one Fleio product defined (connected to 2 Fleio installations for example).
 
 Any WHMCS automated billing will not work as expected and is not recommended.
-Instead you should use the Fleio billing system to calculate usage for clients and to require them to pay invoices or add credit.
+Instead, you should use the Fleio billing system to calculate usage for clients and to require them to pay invoices or add credit.
 To achieve this, you can set the product as free or set a one time payment requirement in WHMCS.
 
 It's really important to remember that when/if a WHMCS customer's currency is changed, the same operation needs to be done in Fleio and
@@ -158,7 +158,7 @@ If you're using invoice generation features of fleio-whmcs plugin, automatic set
 `have to be disabled in Fleio`. With this setup, in order to settle invoiced service cycles in Fleio (thus also adjusting
 client total credit in Fleio), you may make use of `Mark invoiced periods as paid when using external billing` setting
 from Configuration details / Billing cycles expandable row. This setting works as follows: all invoiced service cycles are
-settled if client has up to date credit greater than 0 after paying a fleio-whmcs invoice, otherwise settling invoiced cycles
+settled if client has up-to-date credit greater than 0 after paying a fleio-whmcs invoice, otherwise settling invoiced cycles
 depends on their associated price and how much credit the client added.
 
 Partial refunds must be manually handled. The Fleio credit will not be modified if you partially refund an invoice in WHMCS
