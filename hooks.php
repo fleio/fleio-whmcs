@@ -195,11 +195,13 @@ function fleio_PostCronjob() {
                         $creditAutoInvoicedCount = $creditAutoInvoicedCount + 1;
                     } catch ( Exception $e ) {
                         logActivity($e->getMessage());
-                        continue;
+                        if ($counter < count($retrievedClients)) {
+                            continue;
+                        }
                     }
                 }
 
-                if ($creditAutoInvoicedCount === 20 || $counter === count($retrievedClients)) {
+                if ($creditAutoInvoicedCount === 20 || $counter >= count($retrievedClients)) {
                     // if we reached 20 clients or the end of list, send them to fleio
                     $creditAutoInvoicedCount = 0;
                     // process clients we found
