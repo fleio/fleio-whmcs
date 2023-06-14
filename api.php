@@ -418,6 +418,20 @@ class Fleio {
                 }
             }
         }
+
+        // re-activate user if inactive
+        try {
+            $relatedUser = $this->getUser($this->clientsdetails->uuid);
+        } catch (Exception $e) {
+            $relatedUser = NULL;
+        }
+        if ($relatedUser !== NULL && !$relatedUser["is_active"]) {
+            try {
+                $this->updateFleioUser($relatedUser["id"], array("is_active" => true));
+            } catch (Exception $e) {
+                // do nothing
+            }
+        }
     }
 
     public function terminateOpenstack($serviceId) {
