@@ -60,7 +60,7 @@ class FleioUtils {
     public static function getClientProduct($clientId, $packageId=NULL, $status='Active') {
         # Get the Fleio service for a client. A client has only one Fleio product.
         try {
-            if (!is_null($packageId)) {
+            if (is_null($packageId)) {
                 $prod = Capsule::table('tblhosting AS th')
                 ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
                 ->where('th.userid', '=', $clientId)
