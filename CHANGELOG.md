@@ -1,3 +1,41 @@
+v2.0.3
+======
+
+https://github.com/fleio/fleio-whmcs/tree/2.0.3
+
+Release date: 2023-06-14
+
+### Added
+
+\-
+
+### Changed
+
+\-
+
+### Fixed
+
+* [fix] #94 Fleio end-user is left inactive after unsuspend from WHMCS 
+
+### Unreleased
+
+\-
+
+### Deprecated
+
+\-
+
+### Removed
+
+\-
+
+### Security
+
+\-
+
+### Notes
+
+
 v2.0.2
 ======
 
