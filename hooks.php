@@ -166,9 +166,11 @@ function fleio_PostCronjob() {
                 $clientsToAutoInvoiceResponse = $flApi->get($urlGetAutoInvoiceClients);
             } catch ( Exception $e ) {
                 $clientsToAutoInvoiceResponse = array("objects" => []);
-                logActivity($e->getMessage());
+                logActivity('Fleio: unable to retrieve clients for auto-invoicing: ' . $e->getMessage());
             }
             $retrievedClients = $clientsToAutoInvoiceResponse['objects'];
+
+            logActivity('Fleio: checking ' . count($retrievedClients) . ' client(s) with auto-invoicing enabled');
             
             $urlProcessAutoInvoicing = "/billing/external-billing/process_clients_for_credit_auto_invoicing";
             $counter = 0;
@@ -194,7 +196,10 @@ function fleio_PostCronjob() {
                         array_push($whmcsClientsToAutoInvoice, $clientToAutoInvoice);
                         $creditAutoInvoicedCount = $creditAutoInvoicedCount + 1;
                     } catch ( Exception $e ) {
-                        logActivity($e->getMessage());
+                        logActivity(
+                            'Fleio: unable to get client ' . $clientFromUUID->id .
+                            ' invoiced amount for retrieving auto-invoicing data: ' . $e->getMessage()
+                        );
                         if ($counter < count($retrievedClients)) {
                             continue;
                         }
@@ -211,7 +216,10 @@ function fleio_PostCronjob() {
                     try {
                         $clientsToAutoInvoice = $flApi->post($urlProcessAutoInvoicing, $urlParams);
                     } catch ( Exception $e ) {
-                        logActivity($e->getMessage());
+                        logActivity(
+                            'Fleio: error processing ' . $creditAutoInvoicedCount .
+                            ' client(s) for auto-invoicing: ' . $e->getMessage()
+                        );
                         continue;
                     }
                     foreach ($clientsToAutoInvoice["objects"] as $clientToAutoInvoice) {
@@ -228,12 +236,16 @@ function fleio_PostCronjob() {
                                     );
                                 } catch ( Exception $e ) {
                                     logActivity(
-                                        'Fleio: error when trying to invoice client ' .
+                                        'Fleio: error when trying to invoice client (for auto-invoicing feature) ' .
                                         $clientToAutoInvoice['external_billing_id'] . ': ' . $e->getMessage()
                                     );
                                     $generatedInvoiceId = NULL;
                                 }
                                 if ($generatedInvoiceId) {
+                                    logActivity(
+                                        'Fleio: created invoice ' . $generatedInvoiceId . ' for client ' .
+                                        $clientToAutoInvoice['external_billing_id'] . ' (because of auto-invoicing feature)'
+                                    );
                                     $clientHasBillingAgreementResponse = FleioUtils::clientHasBillingAgreement(
                                         $clientFromUUID,
                                         $server->configoption13
@@ -252,11 +264,11 @@ function fleio_PostCronjob() {
                             } else {
                                 logActivity(
                                     'Fleio: unable to retrieve WHMCS client with UUID: ' .
-                                    $clientToAutoInvoice['external_billing_id']
+                                    $clientToAutoInvoice['external_billing_id'] . 'while processing auto-invoicing'
                                 );
                             }
                         } catch ( Exception $e ) {
-                            logActivity($e->getMessage());
+                            logActivity('Fleio: error while processing clients for auto-invoicing: ' . $e->getMessage());
                             continue;
                         }
                     }
