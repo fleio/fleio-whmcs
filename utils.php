@@ -737,6 +737,55 @@ class FleioUtils {
         }
     }
 
+    public static function markWhmcsTerminatedServices($serverDetails, $flApi) {
+        // get terminated services in order to update their status in whmcs
+        $servicesNext = true;
+        $servicePage = 0;
+        while ($servicesNext) {
+            $servicePage = $servicePage + 1;
+            try {
+                $servicesUrl = "/billing/services?filtering=product__product_type:openstack%2Bstatus:terminated&page=" .
+                               (string)$servicePage . "&";
+                $terminatedServices = $flApi->get($servicesUrl, array());
+                if (!$terminatedServices['next']) {
+                    $servicesNext = false;
+                }
+                foreach ($terminatedServices['objects'] as $serviceToTerminate) {
+                    if ($serviceToTerminate['client']['external_billing_id']) {
+                        $clientFromUUID = self::getUUIDClient($serviceToTerminate['client']['external_billing_id']);
+                        if ($clientFromUUID !== NULL && $serviceToTerminate['external_billing_id'] !== NULL) {
+                            $whmcsService = Capsule::table('tblhosting')
+                                                ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
+                                                ->where('tblproducts.servertype', '=', 'fleio')
+                                                ->where('tblhosting.userid', '=', $clientFromUUID->id)
+                                                ->where('tblhosting.id', '=', $serviceToTerminate['external_billing_id'])
+                                                ->select('tblhosting.domainstatus')
+                                                ->first();
+                            if ($whmcsService && $whmcsService->domainstatus !== 'Terminated') {
+                                Capsule::table('tblhosting')
+                                    ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
+                                    ->where('tblproducts.servertype', '=', 'fleio')
+                                    ->where('tblhosting.userid', '=', $clientFromUUID->id)
+                                    ->where('tblhosting.id', '=', $serviceToTerminate['external_billing_id'])
+                                    ->update(array("domainstatus"=>'Terminated'));
+                                logActivity(
+                                    'Fleio: marking service of client with id ' . $clientFromUUID->id .
+                                    ' as terminated to reflect Fleio OS service'
+                                );
+                            }
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                logActivity(
+                    'Fleio: unable to retrieve terminated services from '. $serverDetails . ' (' .
+                    $e->getMessage() . ')'
+                );
+                $servicesNext = false;
+            }
+        }
+    }
+
     public static function trimApiUrlTrailingSlash($url) {
         return rtrim($url,"/");
     }
