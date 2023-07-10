@@ -160,6 +160,8 @@ function fleio_PostCronjob() {
 
         FleioUtils::markWhmcsActiveServices($server->configoption4, $flApi);
 
+        FleioUtils::markWhmcsTerminatedServices($server->configoption4, $flApi);
+
         if ($usingInvoicingFeature) {
             $urlGetAutoInvoiceClients = '/billing/external-billing/get_clients_to_auto_invoice_for_external_billing';
             try {
