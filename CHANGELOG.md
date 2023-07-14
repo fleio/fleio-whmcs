@@ -1,3 +1,44 @@
+v2.0.4
+======
+
+https://github.com/fleio/fleio-whmcs/tree/2.0.4
+
+Release date: 2023-07-14
+
+### Added
+
+\-
+
+### Changed
+
+* [change] #93 Add more detailed logging for auto-invoicing feature
+* [change] #98 Sync terminated services from Fleio
+
+### Fixed
+
+* [fix] #92 If last client to auto-invoice throws error, last batch of clients to be processed is skipped
+* [fix] #96 getClientProduct does not work without providing Fleio product ID
+
+
+### Unreleased
+
+\-
+
+### Deprecated
+
+\-
+
+### Removed
+
+\-
+
+### Security
+
+\-
+
+### Notes
+
+
 v2.0.3
 ======
 
