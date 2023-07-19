@@ -163,6 +163,10 @@ depends on their associated price and how much credit the client added.
 
 Partial refunds must be manually handled. The Fleio credit will not be modified if you partially refund an invoice in WHMCS
 
+The module does queries based on `uuid` column from WHMCS `tblclients` table. If this field is not indexed in your database (you
+can see that by running `show indexes from tblclients;`), we strongly recommend to add it by 
+running ```ALTER TABLE `tblclients` ADD INDEX `uuid_index` (`uuid`);```.
+
 
 License information
 ===================
