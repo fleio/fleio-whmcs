@@ -1,3 +1,44 @@
+v2.0.5
+======
+
+https://github.com/fleio/fleio-whmcs/tree/2.0.5
+
+Release date: 2023-07-20
+
+### Added
+
+\-
+
+### Changed
+
+\-
+
+### Fixed
+
+* [fix] #101 Automatically generated invoices do not change client credit in Fleio once paid
+
+
+### Unreleased
+
+\-
+
+### Deprecated
+
+\-
+
+### Removed
+
+\-
+
+### Security
+
+\-
+
+### Notes
+
+* [internal] #100 Specify in readme that `tblclients` - `uuid` column should be indexed
+
+
 v2.0.4
 ======
 
