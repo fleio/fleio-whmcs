@@ -102,7 +102,7 @@ class FleioUtils {
         }
     }
 
-    private static function createServiceInvoice($serviceId, $invoiceData, $type) {
+    private static function createServiceInvoice($serviceId, $invoiceData, $type='Hosting') {
         try {
             $adminUsername = self::getWHMCSAdmin();
         } catch (Exception $e) {
@@ -134,7 +134,7 @@ class FleioUtils {
         }
     }
 
-    public static function createFleioInvoice($productId, $data, $type='Hosting') {
+    public static function createFleioInvoice($productId, $data) {
         # Helper to create an invoice for a Fleio product
         # Automatically calculate the date and duedate based on config
         global $CONFIG;
@@ -147,7 +147,7 @@ class FleioUtils {
             $data['duedate'] = $dueDateTime->format('Y-m-d');
         }
 
-        return self::createServiceInvoice($productId, $data, $type);
+        return self::createServiceInvoice($productId, $data);
     }
 
     public static function createOverdueClientInvoice($clientId, $amount, $fleioServiceId, $invoicePaymentMethod=NULL) {
@@ -174,7 +174,7 @@ class FleioUtils {
             $data['paymentmethod'] = $invoicePaymentMethod;
         }
 
-        return self::createServiceInvoice($fleioServiceId, $data, $type);
+        return self::createServiceInvoice($fleioServiceId, $data);
     }
 
     public static function clientHasPaidFleioRelatedInvoice($clientId) {
