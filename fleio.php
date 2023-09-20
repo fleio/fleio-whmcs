@@ -1,4 +1,4 @@
-<?php 
+<?php
 
 if (!defined("WHMCS")) {
     die("This file cannot be accessed directly");
@@ -341,8 +341,8 @@ function actionOverview($params, $request) {
             ->first();
         try {
           $uptodateCreditFormatted = formatCurrency($uptodateCredit, $whmcsCurrency->id);
-        } catch (Exception $e) { 
-          $uptodateCreditFormatted = '' . $uptodateCredit; 
+        } catch (Exception $e) {
+          $uptodateCreditFormatted = '' . $uptodateCredit;
         }
     }
     return array('minamount' => $minamount,
@@ -361,9 +361,9 @@ function validateAmount($original_amount, $min, $max) {
     $amount = str_replace(",", ".", $original_amount);
     if (!is_numeric($amount)) {
         throw new Exception("Please enter a valid amount.");
-    } 
+    }
     if ($amount < $min) {
-        $def_msg = isset($_LANG['addfundsminimumerror']) ? $_LANG['addfundsminimumerror'] : 'Amount must be equal or greated than'; 
+        $def_msg = isset($_LANG['addfundsminimumerror']) ? $_LANG['addfundsminimumerror'] : 'Amount must be equal or greated than';
         throw new Exception($def_msg." ".formatCurrency($min));
     }
     if ($amount > $max) {
@@ -387,15 +387,15 @@ function actionCreateInvoice($params, $request) {
     // Min/Max in client's currency
     $minamount = convertCurrency($min_amount, 1, $params['clientsdetails']['currency']);
     $maxamount = convertCurrency($max_amount, 1, $params['clientsdetails']['currency']);
-    
+
     $original_amount = $request["amount"];
-    try { 
+    try {
         $amount = validateAmount($original_amount, $minamount, $maxamount);
     } catch (Exception $e) {
         $overview_vars = actionOverview($params, $request);
         return array_merge($overview_vars, array('validateAmountError' => $e->getMessage(),));
     }
- 
+
     $service = FleioUtils::getServiceById($params['serviceid']);
     if ($service) {
         try {
@@ -411,6 +411,10 @@ function actionCreateInvoice($params, $request) {
     $values["itemdescription1"] = $service->name;
     $values["itemamount1"] = $amount;
     $values["itemtaxed1"] = true;
+
+    if ($service && !is_null($service->paymentmethod)) {
+        $values['paymentmethod'] = $service->paymentmethod;
+    }
 
     try {
         $invoice_id = FleioUtils::createFleioInvoice($params['serviceid'], $values);
