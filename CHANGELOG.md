@@ -1,3 +1,44 @@
+v2.0.6
+======
+
+https://github.com/fleio/fleio-whmcs/tree/2.0.6
+
+Release date: 2023-10-10
+
+### Added
+
+\-
+
+### Changed
+
+\-
+
+### Fixed
+
+* [fix] #103 Service payment method is not set on manual credit invoice create
+
+
+### Unreleased
+
+\-
+
+### Deprecated
+
+\-
+
+### Removed
+
+\-
+
+### Security
+
+\-
+
+### Notes
+
+\-
+
+
 v2.0.5
 ======
 
