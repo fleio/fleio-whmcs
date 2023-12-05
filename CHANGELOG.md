@@ -1,3 +1,43 @@
+v3.0.0
+======
+
+https://github.com/fleio/fleio-whmcs/tree/3.0.0
+
+Release date: 2023-12-05
+
+### Added
+
+\-
+
+### Changed
+
+* [change] #107 Service `resume` API call to `unsuspend`
+
+### Fixed
+
+\-
+
+### Unreleased
+
+\-
+
+### Deprecated
+
+\-
+
+### Removed
+
+\-
+
+### Security
+
+\-
+
+### Notes
+
+* Requires Fleio versions 2023.12 and higher
+
+
 v2.0.6
 ======
 
