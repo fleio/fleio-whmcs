@@ -399,7 +399,7 @@ class Fleio {
         $responseObjects = $response["objects"];
         if (sizeof($responseObjects)) {
             $fleioServiceId = $responseObjects[0]["id"];
-            $url = '/billing/services/' . $fleioServiceId . '/resume';
+            $url = '/billing/services/' . $fleioServiceId . '/unsuspend';
             $this->flApi->post($url);
         }
         // if client is suspended, also run resume on client
