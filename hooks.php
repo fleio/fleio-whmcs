@@ -30,6 +30,12 @@ function fleio_PostCronjob() {
         $capturePaymentImmediately = $server->configoption12 == 'on' ? true : false; // Attempt to capture payment immediately
         $usingInvoicingFeature = $invoiceWithAgreement || $invoiceWithoutAgreement;
         $flApi = new FlApi(FleioUtils::trimApiUrlTrailingSlash($server->configoption4), $server->configoption1);
+
+        $activateVerifiedClientServices = $server->configoption20 == 'on' ? true : false;
+        if ($activateVerifiedClientServices) {
+            FleioUtils::activateEmailVerifiedClientServices();
+        }
+        
         if ($usingInvoicingFeature) {
             FleioUtils::updateClientsBillingAgreement(
                 $flApi,

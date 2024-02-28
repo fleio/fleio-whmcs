@@ -84,6 +84,70 @@ class FleioUtils {
         return $prod;
     }
 
+    public static function getServicesToActivate() {
+        // retrieve pending services for clients with verified email
+        try {
+            return Capsule::table('tblhosting AS th')
+                ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
+                ->where('th.domainstatus', '=', 'Pending')
+                ->where('tp.servertype', '=', 'fleio')
+                ->select('th.*')
+                ->get();
+        } catch (Exception $e) {
+            logActivity('Fleio: unable to retrieve products: ' . $e->getMessage());
+            return array();
+        }
+    }
+
+    public static function activateEmailVerifiedClientServices() {
+        $services = self::getServicesToActivate();
+        foreach($services as $service) {
+            try {
+                $adminUsername = self::getWHMCSAdmin();
+            } catch (Exception $e) {
+                logActivity('Fleio: Cannot get WHMCS admin: ' . $e->getMessage());
+                return;
+            }
+
+
+            $emailVerified = false;
+            $clientID = $service->userid;
+            $userToClients = Capsule::table('tblusers_clients AS tuc')
+                ->where('tuc.client_id', '=', $clientID)
+                ->where('tuc.owner', '=', 1)
+                ->select('tuc.*')
+                ->get();
+            // iterate owners and see if any has email verified
+            foreach($userToClients as $userToClient) {
+                $owner = Capsule::table('tblusers AS tu')
+                    ->where('tu.id', '=', $userToClient->auth_user_id)
+                    ->select('tu.*')
+                    ->first();
+                if (!empty($owner->email_verified_at)) {
+                    $emailVerified = true;
+                    break;
+                }
+            }
+
+            if ($emailVerified) {
+                $postData = array(
+                    'orderid' => $service->orderid,
+                    'autosetup' => true,
+                    'sendemail' => true,
+                );
+                try {
+                    $result = localAPI('AcceptOrder', $postData, $adminUsername);
+                    if ($result["result"] == "success") {
+                    } else {
+                        logActivity('Fleio: Error activating service ID ' . $service->id . ': ' . $result["message"]);
+                    }
+                } catch (Exception $e) {
+                    logActivity('Fleio: Error activating service ID ' . $service->id . ': ' . $e->getMessage());
+                }
+            }
+        }
+    }
+
     public static function getUUIDClient($clientUUID) {
 	    // Get the Fleio product for a WHMCS client specified by Client UUID
         return Capsule::table('tblclients AS tc')

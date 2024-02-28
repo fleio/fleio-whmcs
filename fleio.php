@@ -149,6 +149,11 @@ function fleio_ConfigOptions() {
         "Type" => "yesno",
         "Description" => "Will not invoice for end of cycle if more than 72h passed after cycle end date",
     ),
+    "activateVerifiedClientServices" => array (
+        "FriendlyName" => "Activate services for clients with verified email",
+        "Type" => "yesno",
+        "Description" => "Each time cron runs, will activate Fleio services for clients with verified email",
+    ),
     );
     return $configarray;
 }

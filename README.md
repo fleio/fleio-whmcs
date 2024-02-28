@@ -169,6 +169,18 @@ can see that by running `show indexes from tblclients;`), we strongly recommend 
 running ```ALTER TABLE `tblclients` ADD INDEX `uuid_index` (`uuid`);```.
 
 
+Activate services after clients validate email
+==============================================
+
+If you want Fleio services to be activated only after client validates his email, you can 
+choose "Automatically setup the product when you manually accept a pending order" on the Fleio product's module settings, 
+and also check the "Activate services for clients with verified email" checkbox in the same section.
+This way all clients with verified emails and pending services will be processed during cron run and their services will be 
+activated. Also, Email Verification from WHMCS must be enabled for this to properly work.
+
+
+
+
 License information
 ===================
 
