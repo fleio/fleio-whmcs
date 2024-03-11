@@ -1,3 +1,43 @@
+v3.1.0
+======
+
+https://github.com/fleio/fleio-whmcs/tree/3.1.0
+
+Release date: 2024-03-11
+
+### Added
+
+* [add] #109 Option to activate OpenStack service only after email verification in WHMCS
+
+### Changed
+
+\-
+
+### Fixed
+
+\-
+
+### Unreleased
+
+\-
+
+### Deprecated
+
+\-
+
+### Removed
+
+\-
+
+### Security
+
+\-
+
+### Notes
+
+* Requires Fleio versions 2023.12 and higher
+
+
 v3.0.0
 ======
 
