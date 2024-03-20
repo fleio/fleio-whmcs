@@ -154,6 +154,11 @@ function fleio_ConfigOptions() {
         "Type" => "yesno",
         "Description" => "Each time cron runs, will activate Fleio services for clients with verified email",
     ),
+    "invoiceSuspendedClients" => array (
+        "FriendlyName" => "Generate invoices for suspended services",
+        "Type" => "yesno",
+        "Description" => "Also process suspended clients and generate invoices for them. Works only starting with Fleio 2024.04",
+    ),
     );
     return $configarray;
 }

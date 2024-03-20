@@ -57,14 +57,14 @@ class FleioUtils {
         return $prod;
     }
 
-    public static function getClientProduct($clientId, $packageId=NULL, $status='Active') {
+    public static function getClientProduct($clientId, $packageId=NULL) {
         # Get the Fleio service for a client. A client has only one Fleio product.
         try {
             if (is_null($packageId)) {
                 $prod = Capsule::table('tblhosting AS th')
                 ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
                 ->where('th.userid', '=', $clientId)
-                ->where('th.domainstatus', '=', $status)
+                ->whereIn('th.domainstatus', array('Active', 'Suspended'))
                 ->where('tp.servertype', '=', 'fleio')
                 ->select('th.*')
                 ->first();
@@ -72,7 +72,7 @@ class FleioUtils {
                 $prod = Capsule::table('tblhosting AS th')
                 ->join('tblproducts AS tp', 'th.packageid', '=', 'tp.id')
                 ->where('th.userid', '=', $clientId)
-                ->where('th.domainstatus', '=', $status)
+                ->whereIn('th.domainstatus', array('Active', 'Suspended'))
                 ->where('tp.id', '=', $packageId)
                 ->where('tp.servertype', '=', 'fleio')
                 ->select('th.*')

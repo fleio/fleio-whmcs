@@ -52,6 +52,10 @@ function fleio_PostCronjob() {
                 "has_external_billing" => 'True', // only clients with external billing set and credit less than 0
                 "uptodate_credit_max" => 0
             );
+            $invoiceSuspendedClients = $server->configoption21 == 'on' ? true : false;
+            if ($invoiceSuspendedClients) {
+                $urlParams["process_suspended"] = 'true';
+            }
 
             if ($invoiceWithAgreement && $invoiceWithoutAgreement) {
                 logActivity('Fleio: Looking at clients with and without a billing agreement');
