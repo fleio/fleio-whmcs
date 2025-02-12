@@ -512,9 +512,9 @@ class Fleio {
     	     return $this->flApi->post($url, $params); 
    	        } catch (Exception $e) {
                if ($addCredit) {
-   	               logActivity('Fleio unable to add credit in Fleio for User ID: ' . $this->clientsdetails->userid . ' with ' . (string)$clientAmount);
+   	               logActivity('Fleio unable to add credit in Fleio for Client ID: ' . $this->clientsdetails->userid . ' with ' . (string)$clientAmount);
                } else {
-                   logActivity('Fleio unable to withdraw credit from FLeio for User ID: ' . $this->clientsdetails->userid . ' with ' . (string)$clientAmount);
+                   logActivity('Fleio unable to withdraw credit from FLeio for Client ID: ' . $this->clientsdetails->userid . ' with ' . (string)$clientAmount);
                }
    	           throw $e; 
    	        }
