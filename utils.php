@@ -594,7 +594,7 @@ class FleioUtils {
                         $invoicePaymentMethod
                     );
                     logActivity(
-                        'Fleio: issued Invoice ID: '. $invoiceId .' for User ID: '.
+                        'Fleio: issued Invoice ID: '. $invoiceId .' for Client ID: '.
                         $whmcsClient->id. ' due to end of cycle for '.
                         $amountUsedAndUninvoiced . ' ' .
                         $alreadyInvoicedAndUnpaid["currency"]["code"]
@@ -615,7 +615,7 @@ class FleioUtils {
                         $invoicePaymentMethod
                     );
                     logActivity(
-                        'Fleio: issued Invoice ID: '. $invoiceId .' for User ID: '.
+                        'Fleio: issued Invoice ID: '. $invoiceId .' for Client ID: '.
                         $whmcsClient->id. ' for over credit limit of '.
                         $amountUsedAndUninvoiced . ' ' . $alreadyInvoicedAndUnpaid["currency"]["code"]
                     );
@@ -676,7 +676,7 @@ class FleioUtils {
                     $invoicePaymentMethod
                 );
                 logActivity(
-                    'Fleio: issued Invoice ID: '. $invoiceId .' for User ID: '.
+                    'Fleio: issued Invoice ID: '. $invoiceId .' for Client ID: '.
                     $whmcsClient->id. ' due to auto invoicing feature for '.
                     $finalAmount . ' ' .
                     $alreadyInvoicedAndUnpaid["currency"]["code"]

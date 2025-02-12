@@ -432,7 +432,7 @@ function actionCreateInvoice($params, $request) {
         logActivity('Fleio: unable to create invoice for service ' . $params['serviceid'] . ': ' . $e->getMessage());
         throw new Exception('Unable to create invoice');
     }
-	$log_msg = "Fleio: User ID: ".$clientsdetails['userid']." created credit Invoice ID: ".$invoice_id." with amount ".formatCurrency($amount);
+	$log_msg = "Fleio: Client ID: ".$clientsdetails['userid']." created credit Invoice ID: ".$invoice_id." with amount ".formatCurrency($amount);
 	logActivity($log_msg);
 
 	redir("id=".(int) $invoice_id,"viewinvoice.php");

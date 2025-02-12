@@ -458,9 +458,9 @@ function openstack_change_funds($invoiceid, $subtract=false) {
             try {
                 $addCredit = !$subtract;    // Add credit or subtract, boolean
                 if ($addCredit) {
-                    $msg_format = "Fleio: adding credit for WHMCS User ID: %s with %.02f %s (%.02f %s from Invoice ID: %s)";
+                    $msg_format = "Fleio: adding credit for WHMCS Client ID: %s with %.02f %s (%.02f %s from Invoice ID: %s)";
                 } else {
-                    $msg_format = "Fleio: removing credit for WHMCS User ID: %s with %.02f %s (%.02f %s from Invoice ID: %s)";
+                    $msg_format = "Fleio: removing credit for WHMCS Client ID: %s with %.02f %s (%.02f %s from Invoice ID: %s)";
                 }
                 $msg = sprintf(
                     $msg_format,
