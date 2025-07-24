@@ -214,7 +214,7 @@ class FleioUtils {
         return self::createServiceInvoice($productId, $data);
     }
 
-    public static function createOverdueClientInvoice($clientId, $amount, $fleioServiceId, $invoicePaymentMethod=NULL) {
+    public static function createOverdueClientInvoice($clientId, $amount, $fleioServiceId, $invoicePaymentMethod=NULL, $doNotTaxInvoices=false) {
         // Calculate date and due date of invoice
         $dueDays = 0;
         $today = date('Y-m-d');
@@ -225,6 +225,7 @@ class FleioUtils {
         if (!$fleioServiceId) {
             throw new Exception('Fleio: unable to issue invoice for Client ID: ' . $clientId . ' since no OpenStack products found.');
         }
+        $applyTaxes = $doNotTaxInvoices == 'on' ? false : true;
         $data = [
             "date" => $today,
             "duedate" => $dueDate->format('Y-m-d'),
@@ -232,7 +233,7 @@ class FleioUtils {
             'sendinvoice' => '1',
             'itemdescription1' => 'Cloud services',
             'itemamount1' => $amount,
-            'itemtaxed1' => true
+            'itemtaxed1' => $applyTaxes
         ];
         if (!is_null($invoicePaymentMethod)) {
             $data['paymentmethod'] = $invoicePaymentMethod;
@@ -543,7 +544,7 @@ class FleioUtils {
     }
 
     public static function invoiceClient($whmcsClient, $clientDetailsToProcess, $doNotInvoiceAmountBelow,
-                                         $alreadyInvoicedAndUnpaid) {
+                                         $alreadyInvoicedAndUnpaid, $doNotTaxInvoices) {
         $fleioWhmcsService = $alreadyInvoicedAndUnpaid['product'];
         $fleioWhmcsServiceId = $fleioWhmcsService->id;
         $daysSinceLastInvoice = $alreadyInvoicedAndUnpaid['days_since_last_invoice'];
@@ -591,7 +592,8 @@ class FleioUtils {
                         $whmcsClient->id,
                         $amountUsedAndUninvoiced,
                         $fleioWhmcsServiceId,
-                        $invoicePaymentMethod
+                        $invoicePaymentMethod,
+                        $doNotTaxInvoices
                     );
                     logActivity(
                         'Fleio: issued Invoice ID: '. $invoiceId .' for Client ID: '.
@@ -612,7 +614,8 @@ class FleioUtils {
                         $whmcsClient->id,
                         $amountUsedAndUninvoiced,
                         $fleioWhmcsServiceId,
-                        $invoicePaymentMethod
+                        $invoicePaymentMethod,
+                        $doNotTaxInvoices
                     );
                     logActivity(
                         'Fleio: issued Invoice ID: '. $invoiceId .' for Client ID: '.
@@ -627,7 +630,7 @@ class FleioUtils {
     }
 
     public static function invoiceClientByAmount($whmcsClient, $amount, $currencyCode, $doNotInvoiceAmountBelow,
-                                                 $alreadyInvoicedAndUnpaid) {
+                                                 $alreadyInvoicedAndUnpaid, $doNotTaxInvoices) {
         // used for generating invoice for auto invoicing feature
         $fleioWhmcsService = $alreadyInvoicedAndUnpaid['product'];
         $fleioWhmcsServiceId = $fleioWhmcsService->id;
@@ -673,7 +676,8 @@ class FleioUtils {
                     $whmcsClient->id,
                     $finalAmount,
                     $fleioWhmcsServiceId,
-                    $invoicePaymentMethod
+                    $invoicePaymentMethod,
+                    $doNotTaxInvoices
                 );
                 logActivity(
                     'Fleio: issued Invoice ID: '. $invoiceId .' for Client ID: '.

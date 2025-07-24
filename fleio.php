@@ -159,6 +159,11 @@ function fleio_ConfigOptions() {
         "Type" => "yesno",
         "Description" => "Also process suspended clients and generate invoices for them. Works only starting with Fleio 2024.04",
     ),
+    "doNotTaxInvoices" => array (
+        "FriendlyName" => "Do not apply tax to invoices created by this module",
+        "Type" => "yesno",
+        "Description" => "Invoices created by this module will not contain taxes even if tax rules apply to the client",
+    ),
     );
     return $configarray;
 }
@@ -331,7 +336,8 @@ function actionOverview($params, $request) {
     $tax1 = getTaxRate(1, $params['clientsdetails']['state'], $params['clientsdetails']['countrycode']);
     $tax2 = getTaxRate(2, $params['clientsdetails']['state'], $params['clientsdetails']['countrycode']);
     $taxexempt = $params['clientsdetails']['taxexempt'];
-    if ($taxexempt) {
+    $doNotTaxInvoices = $params['configoption22'] ? true : false;
+    if ($taxexempt || $doNotTaxInvoices) {
 		$tax1_rate = 0;
 		$tax2_rate = 0;
     } else {
@@ -420,7 +426,8 @@ function actionCreateInvoice($params, $request) {
     $values["sendinvoice"] = true;
     $values["itemdescription1"] = $service->name;
     $values["itemamount1"] = $amount;
-    $values["itemtaxed1"] = true;
+    $applyTaxes = $params['configoption22'] == 'on' ? false : true;
+    $values["itemtaxed1"] = $applyTaxes;
 
     if ($service && !is_null($service->paymentmethod)) {
         $values['paymentmethod'] = $service->paymentmethod;

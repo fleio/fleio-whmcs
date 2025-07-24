@@ -105,7 +105,8 @@ function fleio_PostCronjob() {
                                         $clientFromUUID,
                                         $clientToProcess,
                                         $server->configoption14,
-                                        FleioUtils::getFleioProductsInvoicedAmount($clientFromUUID->id, $server->id)
+                                        FleioUtils::getFleioProductsInvoicedAmount($clientFromUUID->id, $server->id),
+                                        $server->configoption22
                                     );
                                 } catch ( Exception $e ) {
                                     logActivity(
@@ -244,7 +245,8 @@ function fleio_PostCronjob() {
                                         $clientToAutoInvoice["necessary_credit"],
                                         $clientToAutoInvoice["necessary_credit_currency"],
                                         $server->configoption14,
-                                        FleioUtils::getFleioProductsInvoicedAmount($clientFromUUID->id, $server->id)
+                                        FleioUtils::getFleioProductsInvoicedAmount($clientFromUUID->id, $server->id),
+                                        $server->configoption22
                                     );
                                 } catch ( Exception $e ) {
                                     logActivity(
