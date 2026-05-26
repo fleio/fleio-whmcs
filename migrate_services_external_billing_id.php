@@ -5,6 +5,11 @@ require_once __DIR__ . DIRECTORY_SEPARATOR . 'api.php';
 
 use Illuminate\Database\Capsule\Manager as Capsule;
 
+// IMPORTANT: ensure this is only executed via the command line (CLI)
+if (php_sapi_name() !== 'cli') {
+    die("Nothing to do\n");
+}
+
 $whmcsServicesCount = Capsule::table('tblhosting')
                         ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
                         ->join('tblclients as tc', 'tc.id', '=', 'tblhosting.userid')
@@ -120,5 +125,6 @@ foreach($whmcsClients AS $whmcsClient) {
         }
 }
 echo 'Processed services count: '.$processedServices;
+echo "\r\n";
 
 ?>
