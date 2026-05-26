@@ -858,4 +858,40 @@ class FleioUtils {
         return rtrim($url,"/");
     }
 
+    public static function addCreditRetryQueue(Exception $exc, $userId, $invoiceId, $serviceId, $itemId, $subtract) {
+        if (Capsule::schema()->hasTable('fleio_credit_retry_queue') && $invoiceId && $serviceId) {
+            $queueExists = Capsule::table('fleio_credit_retry_queue')
+                            ->where('invoice_id', $invoiceId)
+                            ->where('service_id', $serviceId)
+                            ->where('subtract', $subtract)  // queue both additions and refunds from same invoice
+                            ->exists();
+            if (!$queueExists) {
+                try {
+                    logActivity(
+                        'External credit update failed for Client ID: ' . $userId .
+                        '. Queuing for retry. Error: ' . $exc->getMessage()
+                    );
+                    Capsule::table('fleio_credit_retry_queue')->insert([
+                        'invoice_id'      => $invoiceId,
+                        'service_id'      => $serviceId,
+                        'item_id'         => $itemId,
+                        'subtract'        => $subtract,
+                        'status'          => 'pending',
+                        'attempts'        => 1,
+                        'last_error'      => $exc->getMessage(),
+                        'next_attempt_at' => date('Y-m-d H:i:s', strtotime('+5 minutes')),
+                        'created_at'      => date('Y-m-d H:i:s'),
+                        'updated_at'      => date('Y-m-d H:i:s'),
+                    ]);
+                } catch (Exception $dbException) {
+                    logActivity(
+                        'Fleio unable create credit retry queue for Client ID: '.
+                         $userId .' and Invoice ID: '. $invoiceId .'. Error: '.
+                         $dbException->getMessage()
+                    );
+                }
+            }
+        }
+    }
+
 }

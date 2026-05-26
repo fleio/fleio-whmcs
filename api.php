@@ -496,9 +496,12 @@ class Fleio {
         }
     }
 
-    public function clientChangeCredit($addCredit, $amount, $currencyCode, $currencyRate, $clientAmount, $clientCurrency, $invoiceId='') {
+    public function clientChangeCredit($addCredit, $amount, $currencyCode, $currencyRate, $clientAmount,
+                                       $clientCurrency, $extSourceKey='') {
         // originally this would have been: exchange_rate => $currencyrate; source_amount => $clientAmount; source_currency => $clientCurrency
-        // but Fleio may not have all the currencies from WHMCS. Also, Fleio does not do the actual exchange either;  
+        // but Fleio may not have all the currencies from WHMCS. Also, Fleio does not do the actual exchange either;
+        // $extSourceKey is used when retrying a failed credit change and verifies in Fleio if the change wasn't
+        // actually done and fleio-whmcs mistakenly thinks the change failed;
     	try {
     	     $fleio_client_id = $this->getClientId();
     	     $url = '/clients/' . $fleio_client_id . '/change_credit';
@@ -508,16 +511,17 @@ class Fleio {
     	                     'source_amount' => $amount,
     	                     'source_currency' => $currencyCode,
                              'add_credit' => $addCredit,
-                             'external_source' => true);
+                             'external_source' => true,
+                             'external_source_key' => ''.$extSourceKey);
     	     return $this->flApi->post($url, $params); 
-   	        } catch (Exception $e) {
-               if ($addCredit) {
-   	               logActivity('Fleio unable to add credit in Fleio for Client ID: ' . $this->clientsdetails->userid . ' with ' . (string)$clientAmount);
-               } else {
-                   logActivity('Fleio unable to withdraw credit from FLeio for Client ID: ' . $this->clientsdetails->userid . ' with ' . (string)$clientAmount);
-               }
-   	           throw $e; 
-   	        }
+        } catch (Exception $e) {
+           if ($addCredit) {
+               logActivity('Fleio unable to add credit in Fleio for Client ID: ' . $this->clientsdetails->userid . ' with ' . (string)$clientAmount);
+           } else {
+               logActivity('Fleio unable to withdraw credit from FLeio for Client ID: ' . $this->clientsdetails->userid . ' with ' . (string)$clientAmount);
+           }
+           throw $e;
+        }
     }
 
 }
