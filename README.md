@@ -179,6 +179,38 @@ This way all clients with verified emails and pending services will be processed
 activated. Also, Email Verification from WHMCS must be enabled for this to properly work.
 
 
+Failed credit update retry mechanism
+====================================
+
+If a credit update (from a paid/refunded Fleio related invoice in WHMCS) fails, the module has a mechanism to retry
+several times to do the change in Fleio. Each retry is performed after a variable delay. Even if an invoice is both
+paid and refunded and both credit updates fail, eventually the retry mechanism will update the Fleio client with both
+"add" and "refunded" credit entries.
+
+> IMPORTANT: The credit retry mechanism is idempotent starting with **Fleio version 2026.07.1**. If a credit change
+> succeeds in Fleio but a network timeout prevents fleio-whmcs from receiving the success response, fleio-whmcs will 
+> safely retry the transaction. Only **Fleio version 2026.07.1** or later will recognize the duplicate request and 
+> prevent duplicate credits from being applied to the client's account.
+
+A queue can have a status of: 
+
+* "pending": the first call to Fleio failed, and the queue will be processed for the first time when the next WHMCS 
+  cron runs after the queue's "next_attempt_at" date
+* "processing": the queue is currently being processed
+* "failed": one of the retry attempts still failed
+* "failed_permanently": the queue reached the maximum retry attempts
+
+To activate this functionality, go to the module directory in `modules/servers/fleio` and run the following command:
+```php setup_fleio_credit_retry_queue_tbl.php```.
+
+Running the above script creates a new table in the WHMCS database called ``fleio_credit_retry_queue`` and the 
+functionality is activated.
+
+To disable this functionality, remove the ``fleio_credit_retry_queue`` table from the database knowing that existing
+queues will be lost.
+
+To list existing queues, access WHMCS database and run: ```select * from fleio_credit_retry_queue;```. Keep in mind 
+that once a queue successfully completes the credit update, it gets deleted to keep the table clean.
 
 
 License information

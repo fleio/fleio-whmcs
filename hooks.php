@@ -167,6 +167,8 @@ function fleio_PostCronjob() {
             }
         }
 
+        processCreditRetryQueue();
+
         FleioUtils::markWhmcsSuspendedServices($server->configoption4, $flApi);
 
         FleioUtils::markWhmcsActiveServices($server->configoption4, $flApi);
@@ -370,7 +372,7 @@ function fleio_update_invoice_hook($vars) {
     }
 }
 
-function openstack_change_funds($invoiceid, $subtract=false) {
+function openstack_change_funds($invoiceid, $subtract=false, $retriedServiceId='') {
     /*
     Check all invoice items and for each Fleio product, either add or
     remove credit based on the total item costs and the action performed.
@@ -421,6 +423,10 @@ function openstack_change_funds($invoiceid, $subtract=false) {
         if (($item->type != 'Hosting') || !isset($cost_by_service[$item->relid]) || in_array($item->relid, $processedServices)) {
              continue;
         }
+        if ($retriedServiceId != '' && $retriedServiceId != $item->relid) {
+            // this is a retry, and it's not for this item, skip
+            continue;
+        }
         array_push($processedServices, $item->relid);
         # We now know that relid is a Hosting package (not a Domain for example)
         $service = FleioUtils::getServiceById($item->relid);
@@ -438,7 +444,13 @@ function openstack_change_funds($invoiceid, $subtract=false) {
                 $fleioClient = $fl->getClient();
             } catch (Exception $e) {
                 logActivity('Unable to get Fleio client currency when trying to change credit: ' . $e->getMessage());
-                return;
+                // credit update for item fails, add retry queue and proceed to next one
+                FleioUtils::addCreditRetryQueue($e, $item->userid, $invoiceid, $item->relid, $item->id, $subtract);
+                if ($retriedServiceId) {
+                    // this is already a retry, throw error to delay queue for next attempt
+                    throw $e;
+                }
+                continue;
             }
             $fleioClientCurrencyCode = $fleioClient['currency'];
             $whmcsFleioClientCurrency = Capsule::table('tblcurrencies')
@@ -453,12 +465,18 @@ function openstack_change_funds($invoiceid, $subtract=false) {
                     $fleioClientCurrencyCode .
                     ') does not exist in whmcs'
                 );
-                return;
+                // credit update for item fails, add retry queue and proceed to next one
+                FleioUtils::addCreditRetryQueue($e, $item->userid, $invoiceid, $item->relid, $item->id, $subtract);
+                if ($retriedServiceId) {
+                    // this is already a retry, throw error to delay queue for next attempt
+                    throw new Exception('Currency ' . $fleioClientCurrencyCode . ' does not exist in WHMCS.');
+                }
+                continue;
             }
             $originalCurrency = getCurrency($item->userid);
             $amount = convertCurrency($clientAmount, $originalCurrency['id'], $whmcsFleioClientCurrency->id);
             try {
-                $addCredit = !$subtract;    // Add credit or subtract, boolean
+                $addCredit = !$subtract;
                 if ($addCredit) {
                     $msg_format = "Fleio: adding credit for WHMCS Client ID: %s with %.02f %s (%.02f %s from Invoice ID: %s)";
                 } else {
@@ -474,13 +492,21 @@ function openstack_change_funds($invoiceid, $subtract=false) {
                     $invoiceid
                 );
                 logActivity($msg);
+
+                $extSourceKey = '' . $invoiceid . '/' . $item->relid;
                 $response = $fl->clientChangeCredit(
                     $addCredit, $amount, $whmcsFleioClientCurrency->code, $originalCurrency["rate"], $clientAmount,
-                    $originalCurrency["code"], $invoiceid
+                    $originalCurrency["code"], $extSourceKey
                 );
             } catch (FlApiException $e) {
-                logActivity("Unable to update the client credit in Fleio: " . $e->getMessage()); 
-                return;
+                logActivity("Unable to update the client credit in Fleio: " . $e->getMessage());
+                // credit update for item fails, add retry queue and proceed to next one
+                FleioUtils::addCreditRetryQueue($e, $item->userid, $invoiceid, $item->relid, $item->id, $subtract);
+                if ($retriedServiceId) {
+                    // this is already a retry, throw error to delay queue for next attempt
+                    throw $e;
+                }
+                continue;
             }
             logActivity(
                 "Fleio: successfully changed client credit with ".$amount." ".$whmcsFleioClientCurrency->code.
@@ -498,6 +524,82 @@ function openstack_add_funds_hook($vars) {
 
 function openstack_del_credit_hook($vars) {
     openstack_change_funds($vars["invoiceid"], true);
+}
+
+function processCreditRetryQueue() {
+    if (!Capsule::schema()->hasTable('fleio_credit_retry_queue')) {
+        // table was not set up, nothing to do
+        return;
+    }
+    $maxAttempts = 10;
+    $now = date('Y-m-d H:i:s');
+
+    $pendingJobs = Capsule::table('fleio_credit_retry_queue')
+        ->whereIn('status', ['pending', 'failed'])
+        ->where('attempts', '<', $maxAttempts)
+        ->where('next_attempt_at', '<=', $now)
+        ->get();
+
+    foreach ($pendingJobs as $job) {
+        logActivity('Fleio: processing credit update retry queue #' . $job->id . ' for Invoice ID ' . $job->invoice_id);
+        Capsule::table('fleio_credit_retry_queue')
+            ->where('id', $job->id)
+            ->update(['status' => 'processing', 'updated_at' => $now]);
+
+        try {
+            try {
+                $fl = Fleio::fromServiceId($job->service_id);
+            } catch (Exception $e) {
+                logActivity(
+                    'Fleio: unable to initialize Fleio API module for credit update retry queue: ' . $e->getMessage()
+                );
+                continue;
+            }
+            // re-attempt processing  the change funds for the invoice & item
+            openstack_change_funds($job->invoice_id, $job->subtract, $job->service_id);
+
+            // on success, remove entry to keep table clean
+            logActivity('Credit Retry Queue: Successfully updated credit in Fleio for Invoice ID: '. $job->invoice_id);
+            Capsule::table('fleio_credit_retry_queue')->where('id', $job->id)->delete();
+
+        } catch (Exception $e) {
+            // on failure, update entry data so it can be retried later;
+            // NOTE: if above DELETE query fails, it is ok to retry later because Fleio will know the entry was already
+            // processed due to "external_source_key" param we provide
+            $nextAttempts = $job->attempts + 1;
+
+            // delay next retry with 2 power attempt count, considering the above maxAttempts limit
+            $delayMinutes = pow(2, $nextAttempts);
+            $nextAttemptTime = date('Y-m-d H:i:s', strtotime("+{$delayMinutes} minutes"));
+            if ($nextAttempts >= $maxAttempts) {
+                $status = 'failed_permanently';
+            } else {
+                $status = 'failed';
+            }
+
+            Capsule::table('fleio_credit_retry_queue')
+                ->where('id', $job->id)
+                ->update([
+                    'status'          => $status,
+                    'attempts'        => $nextAttempts,
+                    'last_error'      => $e->getMessage(),
+                    'next_attempt_at' => $nextAttemptTime,
+                    'updated_at'      => date('Y-m-d H:i:s')
+                ]);
+
+            if ($status === 'failed_permanently') {
+                logActivity(
+                    'CRITICAL: Invoice ID: '. $job->invoice_id .
+                    ' failed Fleio credit sync permanently after max attempts.'
+                );
+            } else {
+                logActivity(
+                    'Fleio: credit update retry queue #' . $job->id . ' failed for Invoice ID: '. $job->invoice_id .
+                    '. Retrying in ' . $delayMinutes . ' minutes.'
+                );
+            }
+        }
+    }
 }
 
 function fleio_ClientAreaPrimarySidebar(MenuItem $pn) {
