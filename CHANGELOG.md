@@ -1,3 +1,42 @@
+v3.3.1
+======
+
+https://github.com/fleio/fleio-whmcs/tree/3.3.1
+
+Release date: 2026-06-04
+
+### Added
+
+\-
+
+### Changed
+
+\-
+
+### Fixed
+
+[fix] #121 Ensure script to set service external IDs can only be run from CLI
+
+### Unreleased
+
+\-
+
+### Deprecated
+
+\-
+
+### Removed
+
+\-
+
+### Security
+
+\-
+
+### Notes
+
+* Requires Fleio versions 2023.12 and higher
+
 v3.3.0
 ======
 
