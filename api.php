@@ -63,16 +63,6 @@ class Fleio {
         return substr(str_shuffle($data), 0, $size);
     }
 
-    public function getBillingPrice() {
-        $fleio_client_id = $this->getClientId();
-    	$url = '/clients/'. $fleio_client_id . '/billing_summary';
-        $response = $this->flApi->get($url);
-        if ($response == null) {
-            throw new FlApiRequestException("Unable to retrieve billing summary", 404);
-        }
-        return $response['price'];
-    }
-
     public function updateServiceExternalBillingId($newServiceExtBillingId, $clientUUID=NULL) {
         if ($clientUUID === NULL) {
             $clientUUID = $this->clientsdetails->uuid;

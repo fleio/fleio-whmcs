@@ -13,7 +13,6 @@ add_hook("InvoicePaid", 99, "openstack_add_funds_hook", "");
 add_hook("InvoiceRefunded", 99, "openstack_del_credit_hook");
 add_hook("ClientAreaPrimarySidebar", 99, "fleio_ClientAreaPrimarySidebar");
 add_hook("ClientAreaPrimaryNavbar", 99, "fleio_ClientAreaPrimaryNavbar");
-add_hook("InvoiceCreation", 99, "fleio_update_invoice_hook");
 add_hook("ClientEdit", 99, "fleio_client_edit");
 //add_hook("DailyCronJob", 99, "fleio_PostCronjob");
 add_hook("AfterCronJob", 99, "fleio_PostCronjob");
@@ -292,83 +291,6 @@ function fleio_PostCronjob() {
             }
         }
 
-    }
-}
-
-function fleio_update_invoice_hook($vars) {
-    if ($vars['source'] != 'autogen') {
-        # created manually in admin or client area or through localAPI (source = 'api'), skip ?
-        return;
-    }
-    $invoice = Capsule::table('tblinvoices')->where('id', '=', $vars["invoiceid"])->first();
-    # NOTE(tomo): Select only Hosting type items. Otherwise we will end up with domains and other types being paid for.
-    $items = Capsule::table('tblinvoiceitems')->where('invoiceid', '=', $vars["invoiceid"])->get();
-    $tax = 0.0;
-    $tax2 = 0.0;
-    $subtotal_price = 0.0;
-    $cost_by_service = array();
-    $product_prices = array();
-    foreach($items as $item) {
-        # NOTE(tomo): Check if relid is set and not an empty string
-        if (($item->relid == '') || !(isset($item->relid))) {
-            continue;
-        }
-        if (isset($cost_by_service[$item->relid])) {
-            $cost_by_service[$item->relid] += $item->amount;
-        } else {
-            $cost_by_service[$item->relid] = $item->amount;
-        }
-    }
-
-    foreach($items as $item) {
-        if (($item->type != 'Hosting') || !isset($cost_by_service[$item->relid])) {
-            continue;
-        }
-        $product = Capsule::table('tblinvoiceitems')
-                        ->join('tblhosting', 'tblinvoiceitems.relid', '=', 'tblhosting.id')
-                        ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
-                        ->where([['tblinvoiceitems.relid', '=', $item->relid], ['tblproducts.servertype', '=', 'fleio'], ['tblhosting.domainstatus', '<>', 'Pending'], ['tblinvoiceitems.type', '=', 'Hosting']])
-                        ->select('tblproducts.servertype', 'tblhosting.domainstatus')->first();
-        if ($product === null) {
-            continue;
-        }
-        try {
-            $fl = Fleio::fromServiceId($item->relid);
-        } catch (Exception $e) {
-            logActivity('Fleio: unable to initialize the Fleio API module: ' . $e->getMessage());
-            continue;
-        }
-        # If the product is active, try to get the price from Fleio billing
-        try {
-            $price = $fl->getBillingPrice();
-        } catch (FlApiException $e) {
-            logActivity('Fleio: unable to get the billing price for Service ID: ' . $item->relid . ' : ' . $e->getMessage());
-            # NOTE(tomo): Deleting the item will cause a retry on the next run, which we want but there
-            # are other complications.
-            # Also note that an invoice may contain multiple entries with the same relid (eg: Setup and Hosting types costs for a product).
-            #Capsule::table('tblinvoiceitems')->where('id', '=', $item->id)->delete();
-            #logActivity('Fleio: deleted service ID: ' . $item->relid . ' from Invoice ID: ' . $invoice->id);
-            continue;
-        }
-        # NOTE(tomo): The price of a Fleio item is usually 0, until we set it from Fleio.
-        Capsule::table('tblinvoiceitems')
-            ->where([['id', (string) $item->id], ['type', '=', 'Hosting']])
-            ->increment('amount', $price);
-        if ($item->taxed) {
-            $tax += $price * $invoice->taxrate / 100;
-            $tax2 += $price * $invoice->taxrate2 / 100;
-        }
-        $subtotal_price += $price;
-    }
-    $total_price = $subtotal_price + $tax + $tax2;
-    if ($total_price > 0) {
-        # Capsule::table('tblinvoices')->where('id', '=', $vars['invoiceid'])->update(array("subtotal"=>$total_price, "tax"=>$tax, "tax2"=>$tax2, "total"=>$total_price));
-        logActivity('Fleio: incrementing price of Invoice ID: '. $vars['invoiceid'] . ' with ' . $total_price . ' and tax with ' . $tax . ' and tax2 with ' . $tax2);
-        Capsule::table('tblinvoices')->where('id', '=', $vars['invoiceid'])->increment('subtotal', $subtotal_price);
-        Capsule::table('tblinvoices')->where('id', '=', $vars['invoiceid'])->increment('total', $total_price);
-        Capsule::table('tblinvoices')->where('id', '=', $vars['invoiceid'])->increment('tax', $tax);
-        Capsule::table('tblinvoices')->where('id', '=', $vars['invoiceid'])->increment('tax2', $tax2);
-        logActivity('Fleio: prices and taxes updated for Invoice ID: ' . $vars['invoiceid']);
     }
 }
 
