@@ -534,6 +534,7 @@ class FlApi {
 
     public function post( $url, $params = NULL) {
         $ch = curl_init();
+        $this->TEMP_HEADERS = array();
         if (is_array($params)) {
             $json_params = json_encode($params);
             curl_setopt($ch, CURLOPT_POSTFIELDS, $json_params);
