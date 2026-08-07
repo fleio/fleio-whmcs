@@ -204,24 +204,7 @@ class Fleio {
                 $url = '/billing/services/' . $fleioServiceId . '/activate';
                 return $this->flApi->post($url);
             } else {
-                // This service is not in fleio, check if user has another terminated one and create a new OS service if so (fleio supports at most 1 active/suspended service per client)
-                try {
-                    $filteringString = "client__external_billing_id:" . (string)$this->clientsdetails->uuid . "+product__product_type:openstack";
-                    $otherServicesResponse = $this->flApi->get($urlFleioService, array("filtering" => $filteringString));
-                } catch (Exception $e) {
-                    throw new FlApiRequestException('Fleio: unable to retrieve services.', 404);
-                }
-                $otherServicesObjects = $otherServicesResponse["objects"];
-                if (sizeof($otherServicesObjects)) {
-                    for($i = 0; $i < sizeof($otherServicesObjects); $i++) {
-                        if ($otherServicesObjects[$i]["status"] !== "terminated") {
-                            throw new FlApiRequestException(
-                                'Cannot create OS service in fleio. Only one active/suspended service is available for a client.'
-                            );
-                        }
-                    }
-                }
-                // get product data
+                // get product data to create a new service
                 $osServicesUrl = '/openstack/billing/services/';
                 try {
                     $newServiceProductsResp = $this->flApi->get($osServicesUrl . 'new_service_data', array(
