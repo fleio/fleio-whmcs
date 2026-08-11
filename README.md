@@ -187,9 +187,9 @@ several times to do the change in Fleio. Each retry is performed after a variabl
 paid and refunded and both credit updates fail, eventually the retry mechanism will update the Fleio client with both
 "add" and "refunded" credit entries.
 
-> IMPORTANT: The credit retry mechanism is idempotent starting with **Fleio version 2026.07.1**. If a credit change
+> IMPORTANT: The credit retry mechanism is idempotent starting with **Fleio version 2026.08.1**. If a credit change
 > succeeds in Fleio but a network timeout prevents fleio-whmcs from receiving the success response, fleio-whmcs will 
-> safely retry the transaction. Only **Fleio version 2026.07.1** or later will recognize the duplicate request and 
+> safely retry the transaction. Only **Fleio version 2026.08.1** or later will recognize the duplicate request and 
 > prevent duplicate credits from being applied to the client's account.
 
 A queue can have a status of: 

@@ -1,3 +1,44 @@
+v3.4.0
+======
+
+https://github.com/fleio/fleio-whmcs/tree/3.4.0
+
+Release date: 2026-08-13
+
+### Added
+
+[add] #115 Retry functionality for failed credit updates in Fleio
+
+### Changed
+
+\-
+
+### Fixed
+
+\-
+
+### Unreleased
+
+\-
+
+### Deprecated
+
+\-
+
+### Removed
+
+[remove] #123 Obsolete "fleio_update_invoice_hook"
+
+### Security
+
+\-
+
+### Notes
+
+* Requires Fleio versions 2023.12 and higher
+* Retry mechanism for failed credit updates is idempotent starting with Fleio version 2026.08. More on that can be 
+  found in README.
+
 v3.3.1
 ======
 
