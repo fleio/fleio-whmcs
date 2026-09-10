@@ -1,3 +1,44 @@
+v3.4.1
+======
+
+https://github.com/fleio/fleio-whmcs/tree/3.4.1
+
+Release date: 2026-09-15
+
+### Added
+
+\-
+
+### Changed
+
+[change] #125 Allow creating multiple OpenStack services for a client
+
+### Fixed
+
+[fix] #124 Duplicate request headers accumulate on sequential API client calls
+
+### Unreleased
+
+\-
+
+### Deprecated
+
+\-
+
+### Removed
+
+\-
+
+### Security
+
+\-
+
+### Notes
+
+* Requires Fleio versions 2023.12 and higher
+* Retry mechanism for failed credit updates is idempotent starting with Fleio version 2026.08. More on that can be 
+  found in README.
+
 v3.4.0
 ======
 
