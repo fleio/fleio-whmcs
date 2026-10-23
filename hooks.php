@@ -381,17 +381,19 @@ function openstack_change_funds($invoiceid, $subtract=false, $retriedServiceId='
                                             ->first();
             if (!$whmcsFleioClientCurrency) {
                 logActivity(
-                    'ERROR: Could not proceed changing client (' .
-                    $fleioClient['external_billing_id'] .
-                    ') credit in fleio because his currency from fleio (' .
+                    'ERROR: Could not proceed changing credit in Fleio for WHMCS Client ID: ' .
+                    $item->userid .
+                    ' (Service ID: ' . $item->relid . ', Invoice ID: ' . $invoiceid . ')' .
+                    ' because his currency from Fleio (' .
                     $fleioClientCurrencyCode .
                     ') does not exist in whmcs'
                 );
                 // credit update for item fails, add retry queue and proceed to next one
+                $e = new Exception('Currency ' . $fleioClientCurrencyCode . ' does not exist in WHMCS.');
                 FleioUtils::addCreditRetryQueue($e, $item->userid, $invoiceid, $item->relid, $item->id, $subtract);
                 if ($retriedServiceId) {
                     // this is already a retry, throw error to delay queue for next attempt
-                    throw new Exception('Currency ' . $fleioClientCurrencyCode . ' does not exist in WHMCS.');
+                    throw $e;
                 }
                 continue;
             }
