@@ -346,6 +346,7 @@ function actionOverview($params, $request) {
 	}
 
     $uptodateCredit = NULL;
+    $uptodateCreditFormatted = NULL;
     $outofcreditDatetime = NULL;
     $whmcsClientCurrency = getCurrency($params['clientsdetails']['userid']);
     if (is_array($client) && array_key_exists('uptodate_credit', $client) && array_key_exists('outofcredit_datetime', $client)) {
@@ -404,7 +405,7 @@ function actionCreateInvoice($params, $request) {
     $minamount = convertCurrency($min_amount, 1, $params['clientsdetails']['currency']);
     $maxamount = convertCurrency($max_amount, 1, $params['clientsdetails']['currency']);
 
-    $original_amount = $request["amount"];
+    $original_amount = $request["amount"] ?? '';
     try {
         $amount = validateAmount($original_amount, $minamount, $maxamount);
     } catch (Exception $e) {

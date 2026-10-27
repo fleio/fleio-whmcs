@@ -33,7 +33,7 @@ class FleioUtils {
     public static function daysDiff($stringDate) {
         // Days diff between now and a date as strings: eg: '2019-02-14'
         try {
-            $sndDate = date(strtotime($stringDate));
+            $sndDate = strtotime($stringDate);
             $datediff = time() - $sndDate;
             return floor($datediff / (60 * 60 * 24));
         } catch (Exception $e) {
@@ -202,8 +202,8 @@ class FleioUtils {
         # Helper to create an invoice for a Fleio product
         # Automatically calculate the date and duedate based on config
         global $CONFIG;
-        $data['date'] = $data['date'] ? $data['date'] : date('Y-m-d');
-        if (!$data['duedate']) {
+        $data['date'] = !empty($data['date']) ? $data['date'] : date('Y-m-d');
+        if (empty($data['duedate'])) {
             #TODO(tomo): $duedays = $CONFIG['CreateInvoiceDaysBeforeMonthly'] ? $CONFIG['CreateInvoiceDaysBeforeMonthly'] : $CONFIG['CreateInvoiceDaysBefore'];
             $duedays = $CONFIG['CreateInvoiceDaysBefore'];
             $dueDateTime = new DateTime($data['date']);
@@ -474,8 +474,8 @@ class FleioUtils {
         return $hasAgreement;
     }
 
-    public static function updateClientsBillingAgreement($flApi, $status='Active', $includeGatewaysWithName='', $retryChargesEveryXHours='0',
-                                                         $removeAgreementStatusAfterXFailedCharges='0', $capturePaymentImmediately, $fleioServer) {
+    public static function updateClientsBillingAgreement($flApi, $status, $includeGatewaysWithName, $retryChargesEveryXHours,
+                                                         $removeAgreementStatusAfterXFailedCharges, $capturePaymentImmediately, $fleioServer) {
         logActivity('Fleio: update all clients billing agreements');
         try {
             $clients = Capsule::table('tblhosting AS th')

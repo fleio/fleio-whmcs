@@ -579,7 +579,7 @@ function fleio_client_edit($vars) {
 
 function limitOrders($vars) {
     // doesn't let users order more than one product of type fleio
-    $productsInCart = $_SESSION['cart']['products'];
+    $productsInCart = $_SESSION['cart']['products'] ?? array();
     $fleioRelatedServicesInCart = 0;
     foreach ($productsInCart as $product) {
         $dbProduct = Capsule::table('tblproducts')
@@ -592,7 +592,7 @@ function limitOrders($vars) {
                 global $errormessage;
                 $errormessage = "<li>Cloud products are limited to one per customer. Please remove other cloud products from cart.</li>";
             }
-            if ($_SESSION['uid']) {
+            if (!empty($_SESSION['uid'])) {
                 $otherServices = Capsule::table('tblhosting')
                                     ->join('tblproducts', 'tblhosting.packageid', '=', 'tblproducts.id')
                                     ->where('tblproducts.servertype', '=', 'fleio')

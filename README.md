@@ -9,7 +9,7 @@ enables service providers to sell public cloud services.
 
 ## Requirements
 * WHMCS 8.x, 7.8+
-* Requires PHP 7.x
+* Requires PHP 7.x or 8.2 or 8.3
 * Fleio WHMCS module version 3.0.x requires Fleio versions 2023.12 and higher
 * Fleio WHMCS module version 2.0.x works with Fleio versions starting with 2022.11 and up to and including 2023.11
 * Fleio WHMCS module version 1.0.x works with Fleio versions up to and including 2022.10
