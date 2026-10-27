@@ -15,6 +15,8 @@ class FlApiRequestException extends FlApiException {}
 
 class Fleio {
     private $SERVER;
+    private $clientsdetails;
+    private $flApi;
 
     public function __construct(stdClass $server, stdClass $clientsdetails) {
         $this->SERVER = $server;
@@ -320,6 +322,7 @@ class Fleio {
         if ($response === null) {
             throw new FlApiRequestException('Fleio: unable to find service ' . $serviceId . ' for suspension. Check if client and service are tied through external_billing_id', 404);
         }
+        $fleioServiceId = '';
         $responseObjects = $response["objects"];
         if (sizeof($responseObjects)) {
             $fleioServiceId = $responseObjects[0]["id"];
@@ -419,6 +422,7 @@ class Fleio {
         if ($response === null) {
             throw new FlApiRequestException('Fleio: unable to find service ' . $serviceId . ' for termination. Check if client and service are tied through external_billing_id.', 404);
         }
+        $fleioServiceId = '';
         $responseObjects = $response["objects"];
         if (sizeof($responseObjects)) {
             $fleioServiceId = $responseObjects[0]["id"];
@@ -588,7 +592,7 @@ class FlApi {
                 try {
                     $err_msg = $this->drf_get_details($drf_error);
                 } catch (Exception $e) {
-                    $err_msg = 'bad request: ' . $httpdoce . '; Unable to parse error message.';
+                    $err_msg = 'bad request: ' . $httpcode . '; Unable to parse error message.';
                 }
 			}
 		}
