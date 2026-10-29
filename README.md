@@ -212,6 +212,9 @@ queues will be lost.
 To list existing queues, access WHMCS database and run: ```select * from fleio_credit_retry_queue;```. Keep in mind 
 that once a queue successfully completes the credit update, it gets deleted to keep the table clean.
 
+Other useful commands to inspect or modify the ``fleio_credit_retry_queue`` table are described in 
+the ``credit_retry_queue_checks.md`` file.
+
 
 License information
 ===================
