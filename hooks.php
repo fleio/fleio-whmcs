@@ -471,6 +471,12 @@ function processCreditRetryQueue() {
             ->update(['status' => 'processing', 'updated_at' => $now]);
 
         try {
+            if (!FleioUtils::getServiceById($job->service_id)) {
+                logActivity(
+                    'Fleio: service ID ' . $job->service_id . ' from credit update retry queue #' . $job->id . ' no longer exists'
+                );
+                continue;
+            }
             try {
                 $fl = Fleio::fromServiceId($job->service_id);
             } catch (Exception $e) {
