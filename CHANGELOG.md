@@ -1,3 +1,45 @@
+v3.4.2
+======
+
+https://github.com/fleio/fleio-whmcs/tree/3.4.2
+
+Release date: 2026-11-24
+
+### Added
+
+\-
+
+### Changed
+
+* [change] #104 Update code to support PHP 8.3
+
+### Fixed
+
+* [fix] #128 Credit update crashes and is never retried when Fleio client's currency doesn't exist in WHMCS
+* [fix] #130 Crash during cron run if a credit retry queue exists for a missing service
+
+### Unreleased
+
+\-
+
+### Deprecated
+
+\-
+
+### Removed
+
+\-
+
+### Security
+
+\-
+
+### Notes
+
+* Requires Fleio versions 2023.12 and higher
+* Retry mechanism for failed credit updates is idempotent starting with Fleio version 2026.08. More on that can be 
+  found in README.
+
 v3.4.1
 ======
 
